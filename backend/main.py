@@ -170,6 +170,61 @@ async def get_aggregate_data(lat: float, lon: float):
         }
     }
 
+class InsightRequest(BaseModel):
+    aqi: float = 50
+    water_score: float = 80
+    phi_score: float = 75
+    soil_score: float = 80
+    water_ph: float = 7.0
+    turbidity: float = 3.0
+
+@app.post("/insights")
+async def get_insights(data: InsightRequest):
+    alerts = []
+
+    # AQI Rules
+    if data.aqi > 100:
+        alerts.append({"id": "aqi_critical", "level": "critical", "module": "AirTrace",
+            "title": "Hazardous Air Quality", "message": f"AQI {data.aqi} exceeds safe limit (100). Avoid outdoor activity."})
+    elif data.aqi > 50:
+        alerts.append({"id": "aqi_warning", "level": "warning", "module": "AirTrace",
+            "title": "Moderate Air Quality", "message": f"AQI {data.aqi} is elevated. Sensitive groups should take precautions."})
+    else:
+        alerts.append({"id": "aqi_ok", "level": "info", "module": "AirTrace",
+            "title": "Air Quality Good", "message": f"AQI {data.aqi} is within healthy range."})
+
+    # Water Rules
+    if data.water_score < 50:
+        alerts.append({"id": "water_critical", "level": "critical", "module": "RiverPulse",
+            "title": "Water Contamination Alert", "message": "Water health score critically low. Do not use for consumption."})
+    elif data.water_score < 80:
+        alerts.append({"id": "water_warning", "level": "warning", "module": "RiverPulse",
+            "title": "Marginal Water Quality", "message": "Water quality is below optimal. Treatment recommended."})
+    if data.turbidity > 5:
+        alerts.append({"id": "turbidity", "level": "warning", "module": "RiverPulse",
+            "title": "High Turbidity Detected", "message": f"Turbidity {data.turbidity} NTU exceeds safe threshold (5 NTU)."})
+    if data.water_ph < 6.5 or data.water_ph > 8.5:
+        alerts.append({"id": "water_ph", "level": "warning", "module": "RiverPulse",
+            "title": "Water pH Imbalance", "message": f"pH {data.water_ph} is outside safe range (6.5–8.5)."})
+
+    # Plant Rules
+    if data.phi_score < 40:
+        alerts.append({"id": "phi_critical", "level": "critical", "module": "PlantTalk",
+            "title": "Plant Health Critical", "message": f"PHI score {data.phi_score} indicates severe plant stress. Immediate intervention needed."})
+    elif data.phi_score < 70:
+        alerts.append({"id": "phi_warning", "level": "warning", "module": "PlantTalk",
+            "title": "Moderate Plant Stress", "message": f"PHI score {data.phi_score}. Monitor irrigation and nutrient levels."})
+
+    # Soil Rules
+    if data.soil_score < 50:
+        alerts.append({"id": "soil_critical", "level": "critical", "module": "SoilSense",
+            "title": "Soil Critically Degraded", "message": "Soil health is critical. Apply remediation treatment immediately."})
+    elif data.soil_score < 85:
+        alerts.append({"id": "soil_warning", "level": "warning", "module": "SoilSense",
+            "title": "Soil Health Fair", "message": "Soil quality is below optimal. Consider pH buffering and organic matter addition."})
+
+    return {"insights": alerts, "total": len(alerts)}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

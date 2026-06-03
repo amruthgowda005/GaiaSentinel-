@@ -20,7 +20,27 @@
 - Frontend navigation assumes basic routing for Phase 1.
 
 **Next Phase Plan:**
-- Awaiting Phase 8 prompt from user.
+- Awaiting Phase 9 prompt from user.
+
+## Phase 8
+**APIs Created:**
+- `POST /insights` — Rule engine that evaluates all environmental metrics and returns prioritised AI alerts.
+
+**Rules Implemented:**
+
+| Metric | Warning Threshold | Critical Threshold |
+|---|---|---|
+| AQI | > 50 | > 100 |
+| Water Score | < 80 | < 50 |
+| Turbidity | > 5 NTU | — |
+| Water pH | < 6.5 or > 8.5 | — |
+| PHI Score | < 70 | < 40 |
+| Soil Score | < 85 | < 50 |
+
+**Frontend:**
+- Insight cards rendered below each module's result card (filtered by module).
+- Alert badge in the top HUD shows real-time critical count.
+- Insights auto-trigger after every planetary scan via the sidebar.
 
 ## Phase 7
 **APIs Created:**
