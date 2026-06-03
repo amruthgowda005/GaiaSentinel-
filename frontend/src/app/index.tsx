@@ -13,6 +13,7 @@ export default function HomeScreen() {
   const [soilPh, setSoilPh] = useState<string>('');
   const [soilMoisture, setSoilMoisture] = useState<string>('');
   const [soilResult, setSoilResult] = useState<any>(null);
+  const [waterData, setWaterData] = useState<any>(null);
 
   useEffect(() => {
     if (location) {
@@ -20,6 +21,11 @@ export default function HomeScreen() {
         .then(res => res.json())
         .then(data => setAqiData(data))
         .catch(err => console.error("AQI Fetch Error:", err));
+
+      fetch(`http://localhost:8000/water/quality?lat=${location.coords.latitude}&lon=${location.coords.longitude}`)
+        .then(res => res.json())
+        .then(data => setWaterData(data))
+        .catch(err => console.error("Water Fetch Error:", err));
     }
   }, [location]);
 
@@ -120,7 +126,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Right Side: Data Panels */}
-        <View style={styles.dataPanels}>
+        <ScrollView style={styles.dataPanels} showsVerticalScrollIndicator={false}>
           {aqiData && (
             <View style={styles.panel}>
               <Text style={styles.panelTitle}>AIRTRACE MODULE</Text>
@@ -129,6 +135,19 @@ export default function HomeScreen() {
                 STATUS: {aqiData.status.toUpperCase()}
               </Text>
             </View>
+          )}
+
+          {waterData && (
+             <View style={[styles.panel, { borderColor: waterData.status === 'Pristine' ? '#00E5FF' : (waterData.status === 'Marginal' ? '#FF9800' : '#F44336') }]}>
+               <Text style={styles.panelTitle}>RIVERPULSE MODULE</Text>
+               <Text style={styles.panelData}>SCORE: {waterData.score}/100</Text>
+               <Text style={[styles.panelSub, {color: waterData.status === 'Pristine' ? '#00E5FF' : (waterData.status === 'Marginal' ? '#FF9800' : '#F44336')}]}>STATUS: {waterData.status.toUpperCase()}</Text>
+               <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 10}}>
+                 <Text style={{color: '#8A99B5', fontSize: 10}}>pH: {waterData.metrics.ph}</Text>
+                 <Text style={{color: '#8A99B5', fontSize: 10}}>DO: {waterData.metrics.do_mgl}mg/L</Text>
+                 <Text style={{color: '#8A99B5', fontSize: 10}}>Turbidity: {waterData.metrics.turbidity_ntu}NTU</Text>
+               </View>
+             </View>
           )}
 
           {location && (
@@ -161,7 +180,7 @@ export default function HomeScreen() {
               <Text style={styles.panelSub}>STATUS: {analysisResult.status.toUpperCase()}</Text>
             </View>
           )}
-        </View>
+        </ScrollView>
       </View>
 
       {/* Bottom HUD */}

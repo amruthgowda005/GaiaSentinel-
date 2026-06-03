@@ -117,6 +117,33 @@ async def analyze_soil(data: SoilData):
         "recommendation": "Adjust pH buffers" if data.ph < 6 else "Maintain current irrigation"
     }
 
+@app.get("/water/quality")
+async def get_water_quality(lat: float, lon: float):
+    # Mock hydro-sensor data for the area
+    ph = round(random.uniform(6.0, 9.0), 1)
+    turbidity = round(random.uniform(1.0, 12.0), 1) # NTU
+    dissolved_oxygen = round(random.uniform(4.0, 10.0), 1) # mg/L
+
+    score = 100
+    if ph < 6.5 or ph > 8.5: score -= 20
+    if turbidity > 5.0: score -= 20
+    if dissolved_oxygen < 6.0: score -= 30
+
+    status = "Pristine"
+    if score < 50: status = "Contaminated"
+    elif score < 80: status = "Marginal"
+
+    return {
+        "score": max(0, score),
+        "status": status,
+        "metrics": {
+            "ph": ph,
+            "turbidity_ntu": turbidity,
+            "do_mgl": dissolved_oxygen
+        },
+        "source": "Mock Hydro Sensor Network"
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

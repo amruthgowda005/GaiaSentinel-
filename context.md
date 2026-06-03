@@ -20,7 +20,22 @@
 - Frontend navigation assumes basic routing for Phase 1.
 
 **Next Phase Plan:**
-- Awaiting Phase 6 prompt from user.
+- Awaiting Phase 7 prompt from user.
+
+## Phase 6
+**APIs Created:**
+- `GET /water/quality?lat=...&lon=...` (Backend) - Generates water quality telemetry.
+
+**Data Source:**
+- Mock Hydro Sensor Network (Simulated based on geolocation)
+
+**Metrics Used:**
+- `pH`: 6.0 - 9.0 (Ideal: 6.5 - 8.5)
+- `Turbidity (NTU)`: Clarity of water (Ideal: < 5.0)
+- `Dissolved Oxygen (mg/L)`: Oxygen level for aquatic life (Ideal: > 6.0)
+
+**UI Component:**
+- **RIVERPULSE MODULE**: Added to the Sci-Fi dashboard right-side telemetry panel, automatically triggered when geolocation is established. Displays score, status (Pristine, Marginal, Contaminated), and raw metrics.
 
 ## Phase 5
 **APIs Created:**
