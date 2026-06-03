@@ -20,7 +20,21 @@
 - Frontend navigation assumes basic routing for Phase 1.
 
 **Next Phase Plan:**
-- Awaiting Phase 7 prompt from user.
+- Awaiting Phase 8 prompt from user.
+
+## Phase 7
+**APIs Created:**
+- `GET /aggregate?lat=...&lon=...` (Backend) - Unified endpoint to fetch Air, Water, Plant, and Soil data concurrently for a specific geolocation.
+
+**Map Architecture:**
+- React Native absolute positioning over a 3D Earth Mock layer.
+- `plants`: Plotted dynamically using coordinate offset logic, rendered as colored dots based on health.
+- `soils`: Rendered as colored squares.
+- `air`: Renders a global heatmap tint over the globe based on Air Quality Index.
+
+**Layer Logic:**
+- Interactive React Native `Switch` components bound to localized React state (`layers`).
+- Conditional rendering on the Tactical Overlays based on active toggles (AirTrace, RiverPulse, PlantTalk, SoilSense).
 
 ## Phase 6
 **APIs Created:**

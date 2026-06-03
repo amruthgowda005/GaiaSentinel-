@@ -144,6 +144,32 @@ async def get_water_quality(lat: float, lon: float):
         "source": "Mock Hydro Sensor Network"
     }
 
+@app.get("/aggregate")
+async def get_aggregate_data(lat: float, lon: float):
+    water = await get_water_quality(lat, lon)
+    air = await get_aqi(lat, lon)
+    
+    # Generate mock map markers for the tactical UI
+    plants = [
+        {"id": 1, "lat": lat + random.uniform(-0.05, 0.05), "lon": lon + random.uniform(-0.05, 0.05), "status": "Healthy"},
+        {"id": 2, "lat": lat + random.uniform(-0.05, 0.05), "lon": lon + random.uniform(-0.05, 0.05), "status": "Moderate"},
+        {"id": 3, "lat": lat + random.uniform(-0.05, 0.05), "lon": lon + random.uniform(-0.05, 0.05), "status": "Critical"}
+    ]
+    
+    soils = [
+        {"id": 1, "lat": lat + random.uniform(-0.05, 0.05), "lon": lon + random.uniform(-0.05, 0.05), "score": random.randint(40, 100)},
+        {"id": 2, "lat": lat + random.uniform(-0.05, 0.05), "lon": lon + random.uniform(-0.05, 0.05), "score": random.randint(40, 100)}
+    ]
+    
+    return {
+        "air": air,
+        "water": water,
+        "map_markers": {
+            "plants": plants,
+            "soils": soils
+        }
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
