@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, TextInput, ScrollView, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useModule } from './ModuleContext';
 
@@ -26,7 +26,7 @@ export default function HomeScreen() {
   };
 
   const handleGetLocation = () => {
-    if (!navigator.geolocation) { handleDemoMode(); return; }
+    if (typeof navigator === 'undefined' || !navigator.geolocation) { handleDemoMode(); return; }
     navigator.geolocation.getCurrentPosition(
       async pos => {
         const { latitude, longitude } = pos.coords;
@@ -81,49 +81,19 @@ export default function HomeScreen() {
     return '#F44336';
   };
 
-  // ─── CORE:COMMAND ───────────────────────────────────────────────────────────
+  // ─── CORE:COMMAND — Full-screen 3D Earth ────────────────────────────────────
   const renderCoreCommand = () => (
-    <View style={styles.moduleContainer}>
-      <Text style={styles.moduleTitle}>CORE : COMMAND</Text>
-      <Text style={styles.moduleSubtitle}>Initiate planetary scan to activate all modules</Text>
-
-      <View style={styles.earthMock}>
-        {imageUri
-          ? <Image source={{ uri: imageUri }} style={styles.earthImage} />
-          : <Text style={styles.earthText}>[ EARTH TACTICAL GRID ]</Text>}
-        {aggregateData?.map_markers?.plants?.map((p: any, i: number) => (
-          <View key={i} style={[styles.dot, { left: 60 + i * 55, top: 70 + (i % 2) * 50, backgroundColor: color(p.status) }]} />
-        ))}
-        {aggregateData?.map_markers?.soils?.map((s: any, i: number) => (
-          <View key={i} style={[styles.dotSq, { left: 90 + i * 65, top: 160, backgroundColor: s.score > 70 ? '#00E5FF' : '#FF9800' }]} />
-        ))}
-      </View>
-
-      <View style={styles.btnRow}>
-        <TouchableOpacity style={styles.btn} onPress={handleGetLocation}>
-          <Text style={styles.btnTxt}>📡 GET LOCATION</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.btn, { borderColor: '#FFC107' }]} onPress={handleDemoMode}>
-          <Text style={[styles.btnTxt, { color: '#FFC107' }]}>⚡ DEMO MODE</Text>
-        </TouchableOpacity>
-      </View>
-
-      {isLoading && <Text style={styles.loadingText}>⏳ Syncing planetary grid...</Text>}
-
-      {aggregateData && (
-        <View style={styles.summaryGrid}>
-          {[
-            { label: 'AirTrace', value: `AQI ${aggregateData.air?.aqi}`, status: aggregateData.air?.status },
-            { label: 'RiverPulse', value: `${aggregateData.water?.score}/100`, status: aggregateData.water?.status },
-            { label: 'PlantTalk', value: `${aggregateData.map_markers?.plants?.length} nodes`, status: 'Healthy' },
-            { label: 'SoilSense', value: `${aggregateData.map_markers?.soils?.length} sensors`, status: 'Optimal' },
-          ].map((m, i) => (
-            <View key={i} style={[styles.summaryCard, { borderColor: color(m.status) }]}>
-              <Text style={styles.summaryLabel}>{m.label}</Text>
-              <Text style={[styles.summaryValue, { color: color(m.status) }]}>{m.value}</Text>
-              <Text style={styles.summaryStatus}>{m.status}</Text>
-            </View>
-          ))}
+    <View style={styles.earthWrapper}>
+      {Platform.OS === 'web' ? (
+        // @ts-ignore – iframe is web-only
+        <iframe
+          src="/earth.html"
+          style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#02050A' }}
+          title="3D Earth"
+        />
+      ) : (
+        <View style={styles.earthFallback}>
+          <Text style={styles.earthFallbackText}>[ 3D EARTH — WEB ONLY ]</Text>
         </View>
       )}
     </View>
@@ -139,9 +109,7 @@ export default function HomeScreen() {
         <Text style={styles.btnTxt}>📂 UPLOAD PLANT IMAGE</Text>
       </TouchableOpacity>
 
-      {imageUri && (
-        <Image source={{ uri: imageUri }} style={styles.previewImage} />
-      )}
+      {imageUri && <Image source={{ uri: imageUri }} style={styles.previewImage} />}
 
       {imageUri && !analysisResult && (
         <TouchableOpacity style={[styles.btn, { borderColor: '#FFC107', marginTop: 16 }]} onPress={handleAnalyze}>
@@ -207,11 +175,13 @@ export default function HomeScreen() {
       <View style={styles.inputGroup}>
         <View style={styles.inputRow}>
           <Text style={styles.inputLabel}>Soil pH</Text>
-          <TextInput style={styles.textInput} placeholder="e.g. 6.5" placeholderTextColor="#4A5B7A" keyboardType="numeric" value={soilPh} onChangeText={setSoilPh} />
+          <TextInput style={styles.textInput} placeholder="e.g. 6.5" placeholderTextColor="#4A5B7A"
+            keyboardType="numeric" value={soilPh} onChangeText={setSoilPh} />
         </View>
         <View style={styles.inputRow}>
           <Text style={styles.inputLabel}>Moisture %</Text>
-          <TextInput style={styles.textInput} placeholder="e.g. 45" placeholderTextColor="#4A5B7A" keyboardType="numeric" value={soilMoisture} onChangeText={setSoilMoisture} />
+          <TextInput style={styles.textInput} placeholder="e.g. 45" placeholderTextColor="#4A5B7A"
+            keyboardType="numeric" value={soilMoisture} onChangeText={setSoilMoisture} />
         </View>
         <TouchableOpacity style={[styles.btn, { marginTop: 10, alignSelf: 'flex-start' }]} onPress={handleSoilAnalyze}>
           <Text style={styles.btnTxt}>⚙️ RUN SOILSENSE SCAN</Text>
@@ -273,39 +243,50 @@ export default function HomeScreen() {
 
   const renderModule = () => {
     switch (activeModule) {
-      case 'PlantTalk': return renderPlantTalk();
-      case 'AirTrace': return renderAirTrace();
-      case 'SoilSense': return renderSoilSense();
+      case 'PlantTalk':  return renderPlantTalk();
+      case 'AirTrace':   return renderAirTrace();
+      case 'SoilSense':  return renderSoilSense();
       case 'RiverPulse': return renderRiverPulse();
-      default: return renderCoreCommand();
+      default:           return renderCoreCommand();
     }
   };
 
+  const isCore = activeModule === 'CORE:COMMAND';
+
   return (
     <View style={styles.container}>
-      {/* Top HUD bar */}
-      <View style={styles.topHud}>
-        <View style={styles.hubWidget}>
-          <Text style={styles.hubText}>🛰 ORBITAL HUB: V4.TACTICAL — {activeModule}</Text>
+      {/* Top HUD — only show on non-core modules */}
+      {!isCore && (
+        <View style={styles.topHud}>
+          <View style={styles.hubWidget}>
+            <Text style={styles.hubText}>🛰 ORBITAL HUB: V4.TACTICAL — {activeModule}</Text>
+          </View>
+          <View style={styles.syncWidget}>
+            <Text style={styles.syncText}>{isLoading ? '⏳ SYNCING' : aggregateData ? '🟢 ONLINE' : '⚪ STANDBY'}</Text>
+          </View>
         </View>
-        <View style={styles.syncWidget}>
-          <Text style={styles.syncText}>{isLoading ? '⏳ SYNCING' : aggregateData ? '🟢 ONLINE' : '⚪ STANDBY'}</Text>
-        </View>
-      </View>
+      )}
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {renderModule()}
-      </ScrollView>
-
-      <View style={styles.bottomHud}>
-        <Text style={styles.bottomText}>⚡ Planetary Grid — Phases 1-7 Active</Text>
-      </View>
+      {/* Content */}
+      {isCore ? (
+        renderCoreCommand()
+      ) : (
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {renderModule()}
+        </ScrollView>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#02050A' },
+
+  // 3D Earth fills entire panel
+  earthWrapper: { flex: 1, width: '100%', height: '100%' },
+  earthFallback: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  earthFallbackText: { color: '#00E5FF', opacity: 0.4 },
+
   topHud: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1A233A' },
   hubWidget: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#00E5FF', backgroundColor: 'rgba(0,229,255,0.05)' },
   hubText: { color: '#00E5FF', fontWeight: 'bold', letterSpacing: 0.8, fontSize: 12 },
@@ -318,31 +299,12 @@ const styles = StyleSheet.create({
   moduleTitle: { color: '#00E5FF', fontSize: 22, fontWeight: 'bold', letterSpacing: 1, marginBottom: 6 },
   moduleSubtitle: { color: '#8A99B5', fontSize: 13, marginBottom: 28 },
 
-  // Earth Globe
-  earthMock: { width: '100%', maxWidth: 500, height: 300, borderRadius: 12, backgroundColor: '#050D20', borderWidth: 1, borderColor: '#003366', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', position: 'relative', marginBottom: 24, shadowColor: '#0055FF', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 40 },
-  earthImage: { width: '100%', height: '100%', opacity: 0.8 },
-  earthText: { color: '#00E5FF', opacity: 0.4, fontWeight: 'bold' },
-  dot: { position: 'absolute', width: 10, height: 10, borderRadius: 5 },
-  dotSq: { position: 'absolute', width: 10, height: 10 },
+  previewImage: { width: '100%', maxWidth: 500, height: 260, borderRadius: 10, borderWidth: 1, borderColor: '#1A233A' },
 
-  // Summary grid
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 },
-  summaryCard: { flex: 1, minWidth: 120, backgroundColor: 'rgba(10,15,30,0.9)', padding: 16, borderRadius: 10, borderWidth: 1, borderColor: '#1A233A' },
-  summaryLabel: { color: '#4A5B7A', fontSize: 10, fontWeight: 'bold', letterSpacing: 1, marginBottom: 8 },
-  summaryValue: { fontSize: 20, fontWeight: '300', marginBottom: 4 },
-  summaryStatus: { color: '#8A99B5', fontSize: 11 },
-
-  // Buttons
   btnRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
   btn: { paddingHorizontal: 20, paddingVertical: 12, borderWidth: 1, borderColor: '#00E5FF', borderRadius: 8, backgroundColor: 'rgba(0,229,255,0.06)' },
   btnTxt: { color: '#00E5FF', fontWeight: 'bold', fontSize: 12, letterSpacing: 0.8 },
 
-  loadingText: { color: '#4A5B7A', marginBottom: 16 },
-
-  // Preview
-  previewImage: { width: '100%', maxWidth: 500, height: 260, borderRadius: 10, borderWidth: 1, borderColor: '#1A233A' },
-
-  // Result card
   resultCard: { backgroundColor: 'rgba(10,15,30,0.9)', padding: 24, borderRadius: 12, borderWidth: 1, marginTop: 8 },
   resultTitle: { color: '#4A5B7A', fontSize: 11, fontWeight: 'bold', letterSpacing: 1, marginBottom: 12 },
   resultBig: { fontSize: 52, fontWeight: '200', letterSpacing: 2 },
@@ -351,24 +313,18 @@ const styles = StyleSheet.create({
   phiFill: { height: '100%', borderRadius: 3 },
   metaText: { color: '#4A5B7A', fontSize: 11, marginTop: 4 },
 
-  // AQI scale
   scaleTitle: { color: '#4A5B7A', fontSize: 10, fontWeight: 'bold', letterSpacing: 1, marginBottom: 8, marginTop: 12 },
   scaleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   scaleColor: { width: 10, height: 10, borderRadius: 2, marginRight: 10 },
   scaleText: { color: '#8A99B5', fontSize: 12 },
 
-  // Soil inputs
   inputGroup: { backgroundColor: 'rgba(10,15,30,0.9)', padding: 20, borderRadius: 12, borderWidth: 1, borderColor: '#1A233A' },
   inputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   inputLabel: { color: '#8A99B5', fontSize: 13, width: 100, fontWeight: '600' },
   textInput: { flex: 1, backgroundColor: '#02050A', color: '#00E5FF', borderWidth: 1, borderColor: '#1A233A', padding: 10, borderRadius: 7, fontSize: 14 },
 
-  // Water metrics
   metricsGrid: { flexDirection: 'row', gap: 12, marginTop: 16, marginBottom: 12 },
   metricBox: { flex: 1, backgroundColor: '#02050A', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#1A233A', alignItems: 'center' },
   metricLabel: { color: '#4A5B7A', fontSize: 10, fontWeight: 'bold', marginBottom: 6 },
   metricValue: { color: '#00E5FF', fontSize: 16, fontWeight: '300' },
-
-  bottomHud: { padding: 12, borderTopWidth: 1, borderTopColor: '#1A233A', alignItems: 'center' },
-  bottomText: { color: '#00E5FF', fontSize: 11, fontWeight: 'bold' },
 });
