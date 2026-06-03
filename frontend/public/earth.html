@@ -2,140 +2,445 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GaiaSentinel — Earth Core Feed</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #02050A; overflow: hidden; width: 100vw; height: 100vh; }
+  body { background: #000008; overflow: hidden; width: 100vw; height: 100vh; }
   canvas { display: block; }
+
   #hud {
     position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-    color: #FFC107; font-family: monospace; font-size: 12px; font-weight: bold;
-    border: 1px solid #FFC107; padding: 8px 20px; border-radius: 20px;
-    background: rgba(255,193,7,0.05); letter-spacing: 1px; pointer-events: none;
+    color: #FFC107; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold;
+    border: 1px solid rgba(255,193,7,0.5); padding: 8px 20px; border-radius: 20px;
+    background: rgba(255,193,7,0.05); letter-spacing: 2px; pointer-events: none;
+    text-shadow: 0 0 10px rgba(255,193,7,0.8);
+    animation: pulse 3s ease-in-out infinite;
   }
   #sync {
     position: absolute; top: 16px; right: 16px;
     color: #8A99B5; font-family: monospace; font-size: 11px;
-    border: 1px solid #1A233A; padding: 6px 14px; border-radius: 20px;
-    background: rgba(26,35,58,0.5);
+    border: 1px solid rgba(26,35,58,0.8); padding: 6px 14px; border-radius: 20px;
+    background: rgba(10,15,30,0.7);
   }
   #label {
     position: absolute; top: 16px; left: 16px;
     color: #00E5FF; font-family: monospace; font-size: 12px; font-weight: bold;
-    letter-spacing: 1px;
+    letter-spacing: 2px; text-shadow: 0 0 15px rgba(0,229,255,0.9);
   }
+  #loading {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    color: #00E5FF; font-family: monospace; font-size: 14px; letter-spacing: 3px;
+    text-shadow: 0 0 20px rgba(0,229,255,1);
+    animation: blink 1s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
 </style>
 </head>
 <body>
-<div id="label">CORE:COMMAND — LIVE FEED</div>
-<div id="sync">Sync: 0.002ms</div>
-<div id="hud">⚡ Urban Pulse Active</div>
+<div id="label">GAIA SENTINEL — LIVE FEED</div>
+<div id="sync">SYNC: <span id="syncVal">0.000</span>ms</div>
+<div id="hud">⚡ PLANETARY INTELLIGENCE ACTIVE</div>
+<div id="loading">INITIALIZING EARTH CORE...</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.z = 2.5;
+// ─── RENDERER SETUP ────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 1000);
+camera.position.z = 3.2;
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
-  document.body.appendChild(renderer.domElement);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, logarithmicDepthBuffer: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.body.appendChild(renderer.domElement);
 
-  // Stars
-  const starGeo = new THREE.BufferGeometry();
-  const starCount = 8000;
-  const positions = new Float32Array(starCount * 3);
-  for (let i = 0; i < starCount * 3; i++) positions[i] = (Math.random() - 0.5) * 100;
-  starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.05 }));
-  scene.add(stars);
+// ─── TEXTURE LOADER ────────────────────────────────────────────────────────
+const loader = new THREE.TextureLoader();
+loader.crossOrigin = 'anonymous';
 
-  // Earth
-  const earthGeo = new THREE.SphereGeometry(1, 64, 64);
-  const loader = new THREE.TextureLoader();
+// High-quality NASA textures (CORS-friendly mirrors)
+const EARTH_DAY   = 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg';
+const EARTH_NIGHT = 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_lights_2048.png';
+const EARTH_SPEC  = 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_specular_2048.jpg';
+const EARTH_BUMP  = 'https://raw.githubusercontent.com/turban/webgl-earth/master/images/elev_bump_4k.jpg';
+const EARTH_CLOUD = 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_clouds_1024.png';
 
-  // Use public NASA Blue Marble texture via cors-friendly CDN
-  const earthMat = new THREE.MeshPhongMaterial({
-    map: loader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/2_no_clouds_4k.jpg'),
-    specularMap: loader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/water_4k.png'),
-    specular: new THREE.Color('#004488'),
-    shininess: 15,
-    bumpMap: loader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/elev_bump_4k.jpg'),
-    bumpScale: 0.05,
+// ─── REALISTIC STAR FIELD ──────────────────────────────────────────────────
+(function buildStars() {
+  const COUNT = 12000;
+  const pos   = new Float32Array(COUNT * 3);
+  const col   = new Float32Array(COUNT * 3);
+  const sizes = new Float32Array(COUNT);
+  const starColors = [
+    [1.0, 0.85, 0.7],  // warm yellow
+    [0.8, 0.9, 1.0],   // blue-white
+    [1.0, 1.0, 1.0],   // pure white
+    [1.0, 0.7, 0.5],   // orange giant
+    [0.7, 0.8, 1.0],   // cool blue
+  ];
+  for (let i = 0; i < COUNT; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.acos(2 * Math.random() - 1);
+    const r     = 200 + Math.random() * 300;
+    pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+    pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+    pos[i*3+2] = r * Math.cos(phi);
+    const c = starColors[Math.floor(Math.random() * starColors.length)];
+    const brightness = 0.4 + Math.random() * 0.6;
+    col[i*3]   = c[0] * brightness;
+    col[i*3+1] = c[1] * brightness;
+    col[i*3+2] = c[2] * brightness;
+    sizes[i] = Math.random() < 0.02 ? 2.5 : (Math.random() < 0.1 ? 1.5 : 0.8);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { time: { value: 0 } },
+    vertexShader: `
+      attribute float size;
+      attribute vec3 color;
+      varying vec3 vColor;
+      uniform float time;
+      void main() {
+        vColor = color;
+        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+        float twinkle = sin(time * 2.0 + position.x * 0.1 + position.y * 0.07) * 0.3 + 0.7;
+        gl_PointSize = size * twinkle * (400.0 / -mvPos.z);
+        gl_Position = projectionMatrix * mvPos;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vColor;
+      void main() {
+        vec2 uv = gl_PointCoord - 0.5;
+        float d = length(uv);
+        if (d > 0.5) discard;
+        float alpha = smoothstep(0.5, 0.1, d);
+        gl_FragColor = vec4(vColor * 1.5, alpha);
+      }
+    `,
+    transparent: true,
+    vertexColors: true,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
   });
-  const earth = new THREE.Mesh(earthGeo, earthMat);
-  scene.add(earth);
+  scene.add(new THREE.Points(geo, mat));
+  window._starMat = mat;
+})();
 
-  // Clouds
-  const cloudGeo = new THREE.SphereGeometry(1.01, 64, 64);
+// ─── EARTH SHADER (Day/Night blend + Fresnel atmosphere) ──────────────────
+const earthVertexShader = `
+  varying vec2 vUv;
+  varying vec3 vNormal;
+  varying vec3 vWorldPos;
+  void main() {
+    vUv = uv;
+    vNormal = normalize(normalMatrix * normal);
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const earthFragmentShader = `
+  uniform sampler2D dayMap;
+  uniform sampler2D nightMap;
+  uniform sampler2D specMap;
+  uniform vec3 sunDir;
+  uniform vec3 cameraPos;
+  varying vec2 vUv;
+  varying vec3 vNormal;
+  varying vec3 vWorldPos;
+
+  void main() {
+    vec3 normal    = normalize(vNormal);
+    vec3 viewDir   = normalize(cameraPos - vWorldPos);
+    vec3 sun       = normalize(sunDir);
+
+    // Diffuse lighting
+    float NdotL    = dot(normal, sun);
+    float dayMix   = smoothstep(-0.25, 0.25, NdotL);
+
+    vec4 dayColor   = texture2D(dayMap,   vUv);
+    vec4 nightColor = texture2D(nightMap, vUv);
+
+    // Boost city lights brightness
+    vec3 boostedNight = nightColor.rgb * 2.2;
+
+    // Blend day/night
+    vec3 baseColor = mix(boostedNight, dayColor.rgb, dayMix);
+
+    // Specular highlight (oceans)
+    float specStrength = texture2D(specMap, vUv).r;
+    vec3 halfDir   = normalize(sun + viewDir);
+    float spec     = pow(max(dot(normal, halfDir), 0.0), 64.0);
+    vec3 specColor = vec3(1.0, 0.98, 0.9) * spec * specStrength * 0.8;
+
+    // Diffuse shading
+    float ambient  = 0.04;
+    float diffuse  = max(NdotL, 0.0);
+    vec3 lit       = baseColor * (ambient + diffuse) + specColor;
+
+    // Fresnel rim for atmosphere edge
+    float fresnel  = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.5);
+    vec3 atmColor  = vec3(0.3, 0.6, 1.0) * fresnel * dayMix * 0.6;
+    vec3 atmNight  = vec3(0.05, 0.1, 0.3) * fresnel * (1.0 - dayMix) * 0.4;
+
+    gl_FragColor = vec4(lit + atmColor + atmNight, 1.0);
+  }
+`;
+
+// ─── ATMOSPHERE SHADER ─────────────────────────────────────────────────────
+const atmVertexShader = `
+  varying vec3 vNormal;
+  varying vec3 vWorldPos;
+  void main() {
+    vNormal  = normalize(normalMatrix * normal);
+    vec4 wp  = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const atmFragmentShader = `
+  uniform vec3 sunDir;
+  uniform vec3 cameraPos;
+  varying vec3 vNormal;
+  varying vec3 vWorldPos;
+
+  void main() {
+    vec3 normal  = normalize(vNormal);
+    vec3 viewDir = normalize(cameraPos - vWorldPos);
+    vec3 sun     = normalize(sunDir);
+
+    float NdotL  = dot(normal, sun);
+    float dayFac = smoothstep(-0.4, 0.3, NdotL);
+
+    float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 2.5);
+
+    // Blue sky atmosphere + subtle orange/pink at terminator
+    vec3 skyBlue    = vec3(0.2, 0.5, 1.0);
+    vec3 terminator = vec3(0.9, 0.4, 0.15);
+    float termFac   = smoothstep(-0.05, 0.1, NdotL) * smoothstep(0.35, 0.1, NdotL);
+
+    vec3 atmCol = mix(skyBlue, terminator, termFac * 0.7) * dayFac;
+    atmCol     += skyBlue * 0.15 * (1.0 - dayFac); // faint night side glow
+
+    float alpha = fresnel * 0.55;
+    gl_FragColor = vec4(atmCol, alpha);
+  }
+`;
+
+// ─── BUILD EARTH ───────────────────────────────────────────────────────────
+const SUN_POS = new THREE.Vector3(8, 4, 5).normalize().multiplyScalar(10);
+
+let earthMesh, cloudMesh;
+
+function buildEarth(dayTex, nightTex, specTex, bumpTex) {
+  const earthGeo = new THREE.SphereGeometry(1, 96, 96);
+  const earthMat = new THREE.ShaderMaterial({
+    uniforms: {
+      dayMap:    { value: dayTex   },
+      nightMap:  { value: nightTex },
+      specMap:   { value: specTex  },
+      sunDir:    { value: SUN_POS  },
+      cameraPos: { value: camera.position },
+    },
+    vertexShader:   earthVertexShader,
+    fragmentShader: earthFragmentShader,
+  });
+  earthMesh = new THREE.Mesh(earthGeo, earthMat);
+  earthMesh.rotation.y = -Math.PI / 2; // start with Americas in view
+  scene.add(earthMesh);
+}
+
+function buildClouds(cloudTex) {
+  const cloudGeo = new THREE.SphereGeometry(1.005, 64, 64);
   const cloudMat = new THREE.MeshPhongMaterial({
-    map: loader.load('https://raw.githubusercontent.com/turban/webgl-earth/master/images/fair_clouds_4k.png'),
-    transparent: true, opacity: 0.35,
+    map: cloudTex,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
   });
-  const clouds = new THREE.Mesh(cloudGeo, cloudMat);
-  scene.add(clouds);
+  cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+  cloudMesh.rotation.y = -Math.PI / 2;
+  scene.add(cloudMesh);
+}
 
-  // Atmosphere glow
-  const atmGeo = new THREE.SphereGeometry(1.08, 64, 64);
-  const atmMat = new THREE.MeshPhongMaterial({
-    color: 0x0044ff, transparent: true, opacity: 0.08, side: THREE.FrontSide,
+function buildAtmosphere() {
+  const atmGeo = new THREE.SphereGeometry(1.055, 64, 64);
+  const atmMat = new THREE.ShaderMaterial({
+    uniforms: {
+      sunDir:    { value: SUN_POS    },
+      cameraPos: { value: camera.position },
+    },
+    vertexShader:   atmVertexShader,
+    fragmentShader: atmFragmentShader,
+    transparent: true,
+    side: THREE.FrontSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
   });
   scene.add(new THREE.Mesh(atmGeo, atmMat));
 
-  // Outer glow ring
-  const glowGeo = new THREE.SphereGeometry(1.15, 64, 64);
-  const glowMat = new THREE.MeshPhongMaterial({
-    color: 0x0022aa, transparent: true, opacity: 0.04, side: THREE.FrontSide,
+  // Outer halo — use MeshBasicMaterial to avoid shader program issues
+  const haloGeo = new THREE.SphereGeometry(1.14, 48, 48);
+  const haloMat = new THREE.MeshBasicMaterial({
+    color: 0x1155cc,
+    transparent: true,
+    opacity: 0.07,
+    side: THREE.BackSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
   });
-  scene.add(new THREE.Mesh(glowGeo, glowMat));
+  scene.add(new THREE.Mesh(haloGeo, haloMat));
+}
 
-  // Ambient + directional light (sun)
-  scene.add(new THREE.AmbientLight(0x111122, 0.8));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-  sun.position.set(5, 3, 5);
-  scene.add(sun);
+// ─── LIGHTING ──────────────────────────────────────────────────────────────
+// Very dim ambient (space is dark)
+scene.add(new THREE.AmbientLight(0x111133, 0.3));
 
-  // Mouse drag to rotate
-  let isDragging = false;
-  let prevMouse = { x: 0, y: 0 };
-  let rotVelocity = { x: 0, y: 0 };
+// Sun directional
+const sunLight = new THREE.DirectionalLight(0xfff5e8, 2.0);
+sunLight.position.copy(SUN_POS);
+scene.add(sunLight);
 
-  document.addEventListener('mousedown', e => { isDragging = true; prevMouse = { x: e.clientX, y: e.clientY }; });
-  document.addEventListener('mouseup', () => { isDragging = false; });
-  document.addEventListener('mousemove', e => {
-    if (!isDragging) return;
-    const dx = e.clientX - prevMouse.x;
-    const dy = e.clientY - prevMouse.y;
-    rotVelocity.x = dy * 0.005;
-    rotVelocity.y = dx * 0.005;
-    prevMouse = { x: e.clientX, y: e.clientY };
+// Soft fill from the opposite side (earthshine / indirect)
+const fillLight = new THREE.DirectionalLight(0x223366, 0.08);
+fillLight.position.set(-8, -2, -5);
+scene.add(fillLight);
+
+// ─── SUN DISC ──────────────────────────────────────────────────────────────
+(function buildSunDisc() {
+  const sunGeo = new THREE.SphereGeometry(0.06, 32, 32);
+  const sunMat = new THREE.MeshBasicMaterial({ color: 0xfffde0 });
+  const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+  sunMesh.position.copy(SUN_POS).multiplyScalar(18);
+  scene.add(sunMesh);
+
+  // Corona glow
+  const coronaGeo = new THREE.SphereGeometry(0.14, 32, 32);
+  const coronaMat = new THREE.MeshBasicMaterial({
+    color: 0xffe97a,
+    transparent: true, opacity: 0.18,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
   });
+  const corona = new THREE.Mesh(coronaGeo, coronaMat);
+  corona.position.copy(sunMesh.position);
+  scene.add(corona);
+})();
 
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-
-  function animate() {
-    requestAnimationFrame(animate);
-
-    if (isDragging) {
-      earth.rotation.x += rotVelocity.x;
-      earth.rotation.y += rotVelocity.y;
-      clouds.rotation.x += rotVelocity.x;
-      clouds.rotation.y += rotVelocity.y;
-    } else {
-      earth.rotation.y += 0.0015;
-      clouds.rotation.y += 0.0018;
-    }
-    rotVelocity.x *= 0.9;
-    rotVelocity.y *= 0.9;
-
-    stars.rotation.y += 0.0001;
-    renderer.render(scene, camera);
+// ─── LOAD TEXTURES AND BUILD ────────────────────────────────────────────────
+let loaded = 0;
+const total = 5;
+function onLoad() {
+  loaded++;
+  if (loaded === total) {
+    document.getElementById('loading').style.display = 'none';
   }
-  animate();
+}
+
+loader.load(EARTH_DAY, (tex) => {
+  tex.encoding = THREE.sRGBEncoding;
+  loader.load(EARTH_NIGHT, (nightTex) => {
+    nightTex.encoding = THREE.sRGBEncoding;
+    loader.load(EARTH_SPEC, (specTex) => {
+      loader.load(EARTH_BUMP, (bumpTex) => {
+        buildEarth(tex, nightTex, specTex, bumpTex);
+        onLoad(); onLoad(); onLoad(); onLoad();
+        loader.load(EARTH_CLOUD, (cloudTex) => {
+          buildClouds(cloudTex);
+          buildAtmosphere();
+          onLoad();
+        });
+      });
+    });
+  });
+});
+
+// ─── MOUSE / TOUCH DRAG ────────────────────────────────────────────────────
+let isDragging = false;
+let prevMouse  = { x: 0, y: 0 };
+let rotVel     = { x: 0, y: 0 };
+let autoRotate = true;
+
+document.addEventListener('mousedown', e => {
+  isDragging = true; autoRotate = false;
+  prevMouse = { x: e.clientX, y: e.clientY };
+});
+document.addEventListener('mouseup', () => {
+  isDragging = false;
+  // Resume auto-rotation after 3 seconds idle
+  setTimeout(() => { autoRotate = true; }, 3000);
+});
+document.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - prevMouse.x;
+  const dy = e.clientY - prevMouse.y;
+  rotVel.x = dy * 0.004;
+  rotVel.y = dx * 0.004;
+  prevMouse = { x: e.clientX, y: e.clientY };
+});
+
+// Scroll to zoom
+document.addEventListener('wheel', e => {
+  camera.position.z = Math.max(1.8, Math.min(6, camera.position.z + e.deltaY * 0.003));
+}, { passive: true });
+
+// ─── RESIZE ────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ─── SYNC COUNTER ──────────────────────────────────────────────────────────
+const syncEl = document.getElementById('syncVal');
+setInterval(() => {
+  syncEl.textContent = (Math.random() * 0.005).toFixed(3);
+}, 500);
+
+// ─── ANIMATION LOOP ────────────────────────────────────────────────────────
+let lastTime = 0;
+function animate(time) {
+  requestAnimationFrame(animate);
+  const dt = (time - lastTime) / 1000;
+  lastTime = time;
+
+  // Update star twinkle
+  if (window._starMat) window._starMat.uniforms.time.value = time * 0.001;
+
+  if (isDragging) {
+    if (earthMesh) {
+      earthMesh.rotation.x += rotVel.x;
+      earthMesh.rotation.y += rotVel.y;
+    }
+    if (cloudMesh) {
+      cloudMesh.rotation.x += rotVel.x;
+      cloudMesh.rotation.y += rotVel.y;
+    }
+  } else if (autoRotate) {
+    if (earthMesh) earthMesh.rotation.y += 0.0008;
+    if (cloudMesh) cloudMesh.rotation.y += 0.0011; // clouds drift faster
+  }
+
+  // Inertia decay
+  rotVel.x *= 0.88;
+  rotVel.y *= 0.88;
+
+  renderer.render(scene, camera);
+}
+animate(0);
 </script>
 </body>
 </html>
