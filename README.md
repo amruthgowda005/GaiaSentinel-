@@ -1,4 +1,4 @@
-# JURIS AI - Indian Legal Section Recommendation API
+# JURIS AI - Indian Legal Section Recommendation API (GaiaSentinel)
 
 An API to recommend relevant Indian legal sections based on natural language input, using FastAPI and Scikit-learn.
 
