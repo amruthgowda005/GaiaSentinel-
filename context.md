@@ -20,4 +20,21 @@
 - Frontend navigation assumes basic routing for Phase 1.
 
 **Next Phase Plan:**
-- Awaiting Phase 2 prompt from user to expand functionality (e.g., integrating the ML pipeline or adding actual map functionality).
+- Awaiting Phase 3 prompt from user.
+
+## Phase 2
+**APIs Created:**
+- `POST /upload` (Backend) - Accepts multipart/form-data for image uploads with location metadata.
+
+**Data Schema (Metadata):**
+- `latitude`: string (from device GPS)
+- `longitude`: string (from device GPS)
+- `timestamp`: string (ISO 8601 format)
+
+**Permissions Required:**
+- `Camera`: For capturing environmental images.
+- `Location (Foreground)`: For geolocating the captured data.
+
+**Issues Encountered:**
+- Web testing of Camera/Location in Expo requires secure context (HTTPS) or localhost.
+- Android emulator may require mocked location settings.
