@@ -20,7 +20,7 @@
 - Frontend navigation assumes basic routing for Phase 1.
 
 **Next Phase Plan:**
-- Awaiting Phase 3 prompt from user.
+- Awaiting Phase 4 prompt from user.
 
 ## Phase 2
 **APIs Created:**
@@ -38,3 +38,20 @@
 **Issues Encountered:**
 - Web testing of Camera/Location in Expo requires secure context (HTTPS) or localhost.
 - Android emulator may require mocked location settings.
+
+## Phase 3
+**APIs Created:**
+- `POST /plant/analyze` (Backend) - Accepts an image file and returns a mocked Plant Health Index.
+
+**Model / API Used:**
+- Currently using a **Mock Model** inside FastAPI that generates random PHI scores. Will integrate a Scikit-Learn or TensorFlow model in later phases.
+
+**Input/Output Format:**
+- Input: `multipart/form-data` containing an image file.
+- Output: JSON `{ "phi_score": integer, "status": string, "filename": string, "message": string }`
+
+**PHI Calculation Logic:**
+- Random integer between 30 and 100.
+- `Healthy`: 80-100
+- `Moderate`: 50-79
+- `Critical`: 30-49

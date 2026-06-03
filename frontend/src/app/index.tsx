@@ -7,9 +7,10 @@ export default function HomeScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
 
   const handleCapture = async () => {
-    // Request permissions
     const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
     const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
 
@@ -18,7 +19,6 @@ export default function HomeScreen() {
       return;
     }
 
-    // Capture Image
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.5,
@@ -26,7 +26,7 @@ export default function HomeScreen() {
 
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
-      // Get Location
+      setAnalysisResult(null); // Reset analysis on new capture
       const loc = await Location.getCurrentPositionAsync({});
       setLocation(loc);
     }
@@ -35,39 +35,48 @@ export default function HomeScreen() {
   const handleUpload = async () => {
     if (!imageUri || !location) return;
     setIsUploading(true);
-
     try {
       const formData = new FormData();
-      formData.append('file', {
-        uri: imageUri,
-        name: 'capture.jpg',
-        type: 'image/jpeg'
-      } as any);
+      formData.append('file', { uri: imageUri, name: 'capture.jpg', type: 'image/jpeg' } as any);
       formData.append('latitude', location.coords.latitude.toString());
       formData.append('longitude', location.coords.longitude.toString());
       formData.append('timestamp', new Date(location.timestamp).toISOString());
 
-      // Use a local IP address or 10.0.2.2 for Android emulator. For web, localhost works.
-      const response = await fetch('http://localhost:8000/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-      Alert.alert('Success', 'Environmental data captured & uploaded!');
-      setImageUri(null);
-      setLocation(null);
+      await fetch('http://localhost:8000/upload', { method: 'POST', body: formData });
+      Alert.alert('Success', 'Data uploaded successfully!');
     } catch (error) {
-      console.error(error);
       Alert.alert('Upload Failed', 'Could not connect to backend.');
     } finally {
       setIsUploading(false);
     }
   };
 
+  const handleAnalyze = async () => {
+    if (!imageUri) return;
+    setIsAnalyzing(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', { uri: imageUri, name: 'plant.jpg', type: 'image/jpeg' } as any);
+
+      const response = await fetch('http://localhost:8000/plant/analyze', { method: 'POST', body: formData });
+      const data = await response.json();
+      setAnalysisResult(data);
+    } catch (error) {
+      Alert.alert('Analysis Failed', 'Could not connect to the ML API.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    if (status === 'Healthy') return '#4CAF50';
+    if (status === 'Moderate') return '#FF9800';
+    return '#F44336';
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Gaia Sentinel Data Capture</Text>
+      <Text style={styles.title}>Gaia Sentinel</Text>
       
       {imageUri ? (
         <View style={styles.previewContainer}>
@@ -77,9 +86,22 @@ export default function HomeScreen() {
               Loc: {location.coords.latitude.toFixed(4)}, {location.coords.longitude.toFixed(4)}
             </Text>
           )}
+
+          {analysisResult && (
+            <View style={[styles.analysisCard, { borderColor: getStatusColor(analysisResult.status) }]}>
+              <Text style={styles.phiText}>PHI Score: {analysisResult.phi_score}/100</Text>
+              <Text style={[styles.statusText, { color: getStatusColor(analysisResult.status) }]}>
+                Status: {analysisResult.status}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.btnRow}>
+            <TouchableOpacity style={styles.btnAction} onPress={handleAnalyze} disabled={isAnalyzing}>
+              <Text style={styles.btnText}>{isAnalyzing ? 'Analyzing...' : 'Analyze Plant'}</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.btnUpload} onPress={handleUpload} disabled={isUploading}>
-              <Text style={styles.btnText}>{isUploading ? 'Uploading...' : 'Upload Data'}</Text>
+              <Text style={styles.btnText}>{isUploading ? 'Uploading...' : 'Upload'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.btnCancel} onPress={() => setImageUri(null)}>
               <Text style={styles.btnText}>Cancel</Text>
@@ -104,11 +126,15 @@ const styles = StyleSheet.create({
   mapPlaceholder: { width: '100%', height: 350, backgroundColor: '#A5D6A7', justifyContent: 'center', alignItems: 'center', borderRadius: 10, borderWidth: 2, borderColor: '#4CAF50' },
   mapText: { color: '#1B5E20', fontWeight: 'bold', marginBottom: 20 },
   btnCapture: { backgroundColor: '#2E7D32', padding: 15, borderRadius: 8 },
-  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
   previewContainer: { width: '100%', alignItems: 'center' },
   preview: { width: '100%', height: 300, borderRadius: 10, marginBottom: 10 },
   locText: { color: '#1B5E20', marginBottom: 15, fontWeight: '500' },
-  btnRow: { flexDirection: 'row', gap: 10 },
-  btnUpload: { backgroundColor: '#1976D2', padding: 15, borderRadius: 8 },
-  btnCancel: { backgroundColor: '#D32F2F', padding: 15, borderRadius: 8 }
+  analysisCard: { width: '100%', padding: 15, backgroundColor: '#fff', borderRadius: 8, borderWidth: 2, marginBottom: 15, alignItems: 'center' },
+  phiText: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  statusText: { fontSize: 16, fontWeight: 'bold', marginTop: 5 },
+  btnRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', justifyContent: 'center' },
+  btnAction: { backgroundColor: '#FF9800', padding: 12, borderRadius: 8 },
+  btnUpload: { backgroundColor: '#1976D2', padding: 12, borderRadius: 8 },
+  btnCancel: { backgroundColor: '#D32F2F', padding: 12, borderRadius: 8 }
 });

@@ -1,4 +1,5 @@
 import os
+import random
 from datetime import datetime
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,6 +43,25 @@ async def upload_image(
             "longitude": longitude,
             "timestamp": timestamp or datetime.utcnow().isoformat()
         }
+    }
+
+@app.post("/plant/analyze")
+async def analyze_plant(file: UploadFile = File(...)):
+    # Mock model for Phase 3
+    # Simulates Plant Health Index (PHI)
+    phi_score = random.randint(30, 100)
+    if phi_score >= 80:
+        status = "Healthy"
+    elif phi_score >= 50:
+        status = "Moderate"
+    else:
+        status = "Critical"
+        
+    return {
+        "phi_score": phi_score,
+        "status": status,
+        "filename": file.filename,
+        "message": "Analysis complete"
     }
 
 if __name__ == "__main__":
