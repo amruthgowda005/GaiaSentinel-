@@ -1,8 +1,19 @@
-# JURIS AI - Indian Legal Section Recommendation API (GaiaSentinel)
+# Gaia Sentinel
 
-An API to recommend relevant Indian legal sections based on natural language input, using FastAPI and Scikit-learn.
+An intelligent full-stack environmental monitoring and analysis application.
 
-## Setup
-1. Clone the repository
-2. Activate virtual environment: `.\venv\Scripts\activate`
-3. Install dependencies: `pip install -r requirements.txt`
+## Project Structure
+- **/backend**: FastAPI based backend for serving data and models.
+- **/frontend**: React Native (Expo) frontend for a cross-platform eco-themed UI.
+
+## Setup Instructions
+
+### Backend
+1. Activate virtual environment: `.\venv\Scripts\activate`
+2. Install dependencies: `pip install -r requirements.txt`
+3. Run server: `cd backend && uvicorn main:app --reload`
+
+### Frontend
+1. Navigate to frontend: `cd frontend`
+2. Install packages (if not done): `npm install`
+3. Start Expo server: `npm run web` (or `npm start` for mobile testing)
