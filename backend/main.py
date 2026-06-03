@@ -419,6 +419,75 @@ async def test_module(module: str):
     except Exception as e:
         return {"module": module, "status": "error", "error": str(e)}
 
+# ── Phase 11: NatureGPT ──────────────────────────────────────────────────────
+class NatureGPTRequest(BaseModel):
+    query: str
+    context: dict
+
+@app.post("/naturegpt/query")
+async def naturegpt_query(req: NatureGPTRequest):
+    q = req.query.lower()
+    ctx = req.context
+    
+    # Simple Mock LLM / RAG Pipeline
+    response = "I am analyzing the planetary cortex..."
+    
+    if "aqi" in q or "air" in q:
+        air_data = ctx.get("aggregateData", {})
+        if not air_data: air_data = {}
+        air_data = air_data.get("air", {}) if air_data else {}
+        aqi = air_data.get("aqi", "unknown")
+        status = air_data.get("status", "unknown")
+        response = f"The current AQI is {aqi} ({status}). "
+        if str(aqi).isdigit() and int(aqi) > 50:
+            response += "The AQI is elevated. This could be due to local emissions, weather patterns trapping pollutants, or nearby industrial activity."
+        else:
+            response += "Air quality is currently in a safe range."
+            
+    elif "plant" in q:
+        analysis = ctx.get("analysisResult", {})
+        if analysis:
+            phi = analysis.get("phi_score", "unknown")
+            status = analysis.get("status", "unknown")
+            response = f"Based on your latest PlantTalk scan, your plant has a Health Index of {phi}/100, which is considered '{status}'. "
+            if status in ["Moderate", "Critical"]:
+                response += "I recommend checking its watering schedule, ensuring proper sunlight, and inspecting the soil."
+            else:
+                response += "Keep up the good work! Your plant appears to be thriving."
+        else:
+            response = "I don't see any recent plant scans. Please use the PlantTalk module to upload an image first."
+            
+    elif "soil" in q or "water" in q:
+        agg = ctx.get("aggregateData", {})
+        if not agg: agg = {}
+        water_score = agg.get("water", {}).get("score", "unknown") if agg else "unknown"
+        soil = ctx.get("soilResult", {})
+        if not soil: soil = {}
+        soil_score = soil.get("soil_score", "unknown") if soil else "unknown"
+        
+        response = f"Our hydro sensors indicate a water health score of {water_score}/100. "
+        if soil_score != "unknown":
+            response += f"Your last SoilSense scan resulted in a score of {soil_score}/100. "
+        else:
+            response += "I don't have recent local soil data. "
+            
+        response += "Maintaining balanced soil pH and monitoring local water turbidity are critical for a healthy ecosystem."
+        
+    else:
+        # Fallback summarizing overall insights
+        insights = ctx.get("insights", [])
+        if insights:
+            criticals = [i for i in insights if i.get("level") == "critical"]
+            response = f"I'm tracking {len(insights)} active insights in this sector. "
+            if criticals:
+                response += f"Attention: There are {len(criticals)} critical alerts requiring immediate action!"
+            else:
+                response += "All systems are stable, though some warnings may be active."
+        else:
+            response = "I am NatureGPT. I don't see any critical alerts at the moment. You can ask me specific questions about your Air, Water, Soil, or Plant health."
+            
+    return {"response": response, "model": "NatureGPT-Mock-v1"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

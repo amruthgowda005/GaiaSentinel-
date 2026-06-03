@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
 import { useModule, Insight } from './ModuleContext';
 
 export default function HomeScreen() {
@@ -402,6 +402,88 @@ export default function HomeScreen() {
     </ScrollView>
   );
 
+  // ─── NATURE GPT (Phase 11) ────────────────────────────────────────────────
+  const [chatMessages, setChatMessages] = useState<{ role: string, text: string }[]>([
+    { role: 'ai', text: 'Hello Commander. I am NatureGPT. How can I assist you with planetary data today?' }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const handleSendChat = async () => {
+    if (!chatInput.trim()) return;
+    const userMsg = { role: 'user', text: chatInput.trim() };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    setIsTyping(true);
+
+    try {
+      const payload = {
+        query: userMsg.text,
+        context: {
+          aggregateData,
+          analysisResult,
+          soilResult,
+          insights
+        }
+      };
+
+      const res = await fetch('http://localhost:8000/naturegpt/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      
+      setChatMessages(prev => [...prev, { role: 'ai', text: data.response }]);
+    } catch {
+      setChatMessages(prev => [...prev, { role: 'ai', text: 'Error connecting to planetary cortex (backend offline).' }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const renderNatureGPT = () => (
+    <View style={[styles.content, { flex: 1, paddingBottom: 20 }]}>
+      <Text style={styles.moduleTitle}>🤖 NATURE GPT</Text>
+      <Text style={styles.moduleSubtitle}>Conversational Planetary AI (RAG Pipeline)</Text>
+
+      <ScrollView
+        style={styles.chatContainer}
+        contentContainerStyle={{ padding: 16 }}
+        ref={scrollViewRef}
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+      >
+        {chatMessages.map((msg, idx) => (
+          <View key={idx} style={[styles.chatBubble, msg.role === 'user' ? styles.chatUser : styles.chatAi]}>
+            <Text style={styles.chatRole}>{msg.role === 'user' ? 'YOU' : 'NATURE GPT'}</Text>
+            <Text style={styles.chatText}>{msg.text}</Text>
+          </View>
+        ))}
+        {isTyping && (
+          <View style={[styles.chatBubble, styles.chatAi]}>
+            <Text style={styles.chatRole}>NATURE GPT</Text>
+            <Text style={styles.chatText}>Analyzing planetary data...</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      <View style={styles.chatInputContainer}>
+        <TextInput
+          style={styles.chatInput}
+          placeholder="Ask about AQI, Plant Health, or Soil Data..."
+          placeholderTextColor="#4A5B7A"
+          value={chatInput}
+          onChangeText={setChatInput}
+          onSubmitEditing={handleSendChat}
+        />
+        <TouchableOpacity style={styles.chatSendBtn} onPress={handleSendChat}>
+          <Text style={styles.chatSendTxt}>SEND</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   const isCore = activeModule === 'CORE:COMMAND';
 
   const renderModule = () => {
@@ -412,6 +494,7 @@ export default function HomeScreen() {
       case 'RiverPulse': return renderRiverPulse();
       case 'History':    return renderHistory();
       case 'Admin':      return renderAdmin();
+      case 'NatureGPT':  return renderNatureGPT();
       default:           return renderCoreCommand();
     }
   };
@@ -534,4 +617,16 @@ const styles = StyleSheet.create({
   logPath: { color: '#8A99B5', fontSize: 11, flex: 1 },
   logStatus: { fontSize: 11, fontWeight: 'bold', width: 40, textAlign: 'right' },
   logTime: { color: '#4A5B7A', fontSize: 10, width: 50, textAlign: 'right' },
+
+  // Phase 11 — NatureGPT
+  chatContainer: { flex: 1, backgroundColor: 'rgba(10,15,30,0.6)', borderRadius: 12, borderWidth: 1, borderColor: '#1A233A', marginBottom: 16 },
+  chatBubble: { padding: 14, borderRadius: 10, marginBottom: 12, maxWidth: '85%' },
+  chatUser: { backgroundColor: 'rgba(0,229,255,0.1)', alignSelf: 'flex-end', borderBottomRightRadius: 2, borderWidth: 1, borderColor: 'rgba(0,229,255,0.3)' },
+  chatAi: { backgroundColor: 'rgba(255,255,255,0.03)', alignSelf: 'flex-start', borderBottomLeftRadius: 2, borderWidth: 1, borderColor: '#1A233A' },
+  chatRole: { fontSize: 9, fontWeight: 'bold', color: '#4A5B7A', letterSpacing: 1, marginBottom: 4 },
+  chatText: { color: '#E0E6ED', fontSize: 13, lineHeight: 20 },
+  chatInputContainer: { flexDirection: 'row', gap: 10 },
+  chatInput: { flex: 1, backgroundColor: '#02050A', borderWidth: 1, borderColor: '#1A233A', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12, color: '#00E5FF', fontSize: 13 },
+  chatSendBtn: { backgroundColor: 'rgba(0,229,255,0.1)', borderWidth: 1, borderColor: '#00E5FF', borderRadius: 8, paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center' },
+  chatSendTxt: { color: '#00E5FF', fontWeight: 'bold', fontSize: 11, letterSpacing: 1 },
 });

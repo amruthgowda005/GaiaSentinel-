@@ -83,3 +83,18 @@ def test_admin_test_module():
         data = response.json()
         assert data["module"] == "health"
         assert data["status"] == "ok"
+
+def test_naturegpt_query():
+    with TestClient(app) as client:
+        payload = {
+            "query": "What is the AQI?",
+            "context": {
+                "aggregateData": {"air": {"aqi": 75, "status": "Moderate"}}
+            }
+        }
+        response = client.post("/naturegpt/query", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert "response" in data
+        assert "75" in data["response"]
+        assert data["model"] == "NatureGPT-Mock-v1"

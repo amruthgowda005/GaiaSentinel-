@@ -19,9 +19,10 @@ const MENU_ITEMS = [
   { name: 'CarbonMirror', icon: '📊' },
   { name: 'History',      icon: '🕐' },
   { name: 'Admin',        icon: '⚙️' },
+  { name: 'NatureGPT',    icon: '🤖' },
 ];
 
-const ACTIVE_MODULES = ['CORE:COMMAND', 'PlantTalk', 'AirTrace', 'SoilSense', 'RiverPulse', 'History', 'Admin'];
+const ACTIVE_MODULES = ['CORE:COMMAND', 'PlantTalk', 'AirTrace', 'SoilSense', 'RiverPulse', 'History', 'Admin', 'NatureGPT'];
 
 // ─── Sidebar inner component (has access to context) ─────────────────────────
 function Sidebar() {
@@ -224,6 +225,14 @@ function Sidebar() {
           <View style={styles.moduleControls}>
             <Text style={styles.controlsHeader}>ADMIN CONTROLS</Text>
             <Text style={{ color: '#4A5B7A', fontSize: 10 }}>View system health and logs in the main panel.</Text>
+          </View>
+        );
+
+      case 'NatureGPT':
+        return (
+          <View style={styles.moduleControls}>
+            <Text style={styles.controlsHeader}>NATURE GPT</Text>
+            <Text style={{ color: '#4A5B7A', fontSize: 10 }}>Ask questions based on local planetary scan data.</Text>
           </View>
         );
 

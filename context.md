@@ -1,5 +1,27 @@
 # Gaia Sentinel Project Context
 
+## Phase 11
+**Goal:** Create NatureGPT — a conversational AI answering environmental questions using app data.
+
+**Features Implemented:**
+- **Frontend Chat Interface:** Added a `NatureGPT` view in the dashboard with message bubbles, a scrolling chat window, and an input box to communicate with the planetary cortex.
+- **Backend LLM Integration:** Added the `POST /naturegpt/query` endpoint which accepts user queries along with the current planetary context (data from AirTrace, PlantTalk, SoilSense, and RiverPulse).
+
+**LLM Used:**
+- Currently using a local heuristic mock engine named **`NatureGPT-Mock-v1`**. It parses natural language queries and constructs context-aware responses simulating an LLM. It can be easily swapped for an OpenAI or local LangChain instance in future iterations.
+
+**Prompt Structure:**
+- The prompt payload consists of the raw `query` (e.g., "Why is AQI high here?") and the `context` object containing `aggregateData`, `analysisResult`, `soilResult`, and AI `insights`. The model uses these specific telemetry blocks to formulate grounded answers.
+
+**Retrieval Pipeline:**
+- Employs a **RAG (Retrieval-Augmented Generation) pattern**. 
+- 1. **Retrieve:** The frontend actively passes the user's localized state (AQI, plant health, water/soil scores, etc.) as the context context vector.
+- 2. **Augment:** The backend parses the query to determine intent (e.g., air vs. water vs. plant) and zeroes in on the relevant telemetry from the injected payload.
+- 3. **Generate:** The engine responds with a localized, data-driven answer preventing hallucinations since it strictly references the app's real-time state.
+
+**Testing:**
+- Implemented `test_naturegpt_query` in `pytest` to verify the RAG pipeline correctly identifies context elements (like an AQI of 75) and returns a formatted response.
+
 ## Phase 10
 **Goal:** Enable testing and monitoring.
 
