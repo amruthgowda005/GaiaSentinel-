@@ -20,7 +20,24 @@
 - Frontend navigation assumes basic routing for Phase 1.
 
 **Next Phase Plan:**
-- Awaiting Phase 5 prompt from user.
+- Awaiting Phase 6 prompt from user.
+
+## Phase 5
+**APIs Created:**
+- `POST /soil/analyze` (Backend) - Calculates soil health score based on pH and Moisture.
+
+**Inputs Supported:**
+- `ph`: float (Ideal: 6.5 - 7.5)
+- `moisture`: float % (Ideal: 30% - 60%)
+- `soil_type`: string
+
+**Soil Scoring Formula:**
+- Base score: 100
+- Severe pH penalty (-30) for <5.5 or >8.5
+- Mild pH penalty (-10) for <6.0 or >8.0
+- Severe Moisture penalty (-30) for <20% or >80%
+- Mild Moisture penalty (-10) for <30% or >70%
+- Result maps to Optimal, Fair, or Critical.
 
 ## Phase 4
 **APIs Created:**

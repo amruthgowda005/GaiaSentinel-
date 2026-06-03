@@ -4,6 +4,7 @@ import httpx
 from datetime import datetime
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import aiofiles
 
 app = FastAPI(title="Gaia Sentinel API", version="1.0.0")
@@ -82,6 +83,39 @@ async def get_aqi(lat: float, lon: float):
             return {"aqi": aqi, "status": status, "provider": "Open-Meteo"}
         except Exception:
             return {"aqi": 50, "status": "Good", "provider": "Mock Fallback"}
+
+class SoilData(BaseModel):
+    ph: float
+    moisture: float
+    soil_type: str
+
+@app.post("/soil/analyze")
+async def analyze_soil(data: SoilData):
+    score = 100
+    
+    # pH penalty (Ideal: 6.5 - 7.5)
+    if data.ph < 5.5 or data.ph > 8.5:
+        score -= 30
+    elif data.ph < 6.0 or data.ph > 8.0:
+        score -= 10
+        
+    # Moisture penalty (Ideal: 30 - 60%)
+    if data.moisture < 20 or data.moisture > 80:
+        score -= 30
+    elif data.moisture < 30 or data.moisture > 70:
+        score -= 10
+
+    status = "Optimal"
+    if score < 50: 
+        status = "Critical"
+    elif score < 85: 
+        status = "Fair"
+        
+    return {
+        "soil_score": max(0, score),
+        "status": status,
+        "recommendation": "Adjust pH buffers" if data.ph < 6 else "Maintain current irrigation"
+    }
 
 if __name__ == "__main__":
     import uvicorn
