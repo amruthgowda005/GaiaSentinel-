@@ -1,13 +1,40 @@
 import os
 import random
 import httpx
+import aiosqlite
+from contextlib import asynccontextmanager
 from datetime import datetime
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import aiofiles
 
-app = FastAPI(title="Gaia Sentinel API", version="1.0.0")
+DB_PATH = "gaia_sentinel.db"
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: create tables
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS scans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                latitude REAL,
+                longitude REAL,
+                aqi INTEGER,
+                aqi_status TEXT,
+                water_score INTEGER,
+                water_status TEXT,
+                water_ph REAL,
+                turbidity REAL,
+                insights_count INTEGER DEFAULT 0
+            )
+        """)
+        await db.commit()
+    yield
+    # Shutdown: nothing to clean up
+
+app = FastAPI(title="Gaia Sentinel API", version="1.0.0", lifespan=lifespan)
 
 # Allow CORS for frontend interaction
 app.add_middleware(
@@ -224,6 +251,49 @@ async def get_insights(data: InsightRequest):
             "title": "Soil Health Fair", "message": "Soil quality is below optimal. Consider pH buffering and organic matter addition."})
 
     return {"insights": alerts, "total": len(alerts)}
+
+# ── Phase 9: Scan History CRUD ────────────────────────────────────────────────
+class ScanRecord(BaseModel):
+    latitude: float
+    longitude: float
+    aqi: int = 0
+    aqi_status: str = "Unknown"
+    water_score: int = 0
+    water_status: str = "Unknown"
+    water_ph: float = 7.0
+    turbidity: float = 0.0
+    insights_count: int = 0
+
+@app.post("/scan/save")
+async def save_scan(record: ScanRecord):
+    ts = datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("""
+            INSERT INTO scans (timestamp, latitude, longitude, aqi, aqi_status,
+                water_score, water_status, water_ph, turbidity, insights_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (ts, record.latitude, record.longitude, record.aqi, record.aqi_status,
+              record.water_score, record.water_status, record.water_ph,
+              record.turbidity, record.insights_count))
+        await db.commit()
+        return {"id": cursor.lastrowid, "timestamp": ts, "message": "Scan saved"}
+
+@app.get("/scan/history")
+async def get_history(limit: int = 20):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM scans ORDER BY id DESC LIMIT ?", (limit,)
+        )
+        rows = await cursor.fetchall()
+        return {"history": [dict(r) for r in rows], "total": len(rows)}
+
+@app.delete("/scan/history")
+async def clear_history():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM scans")
+        await db.commit()
+    return {"message": "History cleared"}
 
 if __name__ == "__main__":
     import uvicorn

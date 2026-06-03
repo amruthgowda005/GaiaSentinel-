@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Platform, RefreshControl, ActivityIndicator } from 'react-native';
 import { useModule, Insight } from './ModuleContext';
 
 export default function HomeScreen() {
@@ -169,6 +169,126 @@ export default function HomeScreen() {
     );
   };
 
+  // ─── HISTORY TIMELINE (Phase 9) ──────────────────────────────────────────
+  const [history, setHistory] = useState<any[]>([]);
+  const [histLoading, setHistLoading] = useState(false);
+  const [histError, setHistError] = useState('');
+
+  const loadHistory = useCallback(async () => {
+    setHistLoading(true); setHistError('');
+    try {
+      const res = await fetch('http://localhost:8000/scan/history?limit=50');
+      const data = await res.json();
+      setHistory(data.history ?? []);
+    } catch {
+      setHistError('Cannot reach backend. Make sure the server is running.');
+    } finally { setHistLoading(false); }
+  }, []);
+
+  useEffect(() => { if (activeModule === 'History') loadHistory(); }, [activeModule]);
+
+  const renderHistory = () => (
+    <ScrollView
+      contentContainerStyle={[styles.content, { paddingBottom: 80 }]}
+      refreshControl={<RefreshControl refreshing={histLoading} onRefresh={loadHistory} tintColor="#00E5FF" />}
+    >
+      <Text style={styles.moduleTitle}>🕐 SCAN HISTORY</Text>
+      <Text style={styles.moduleSubtitle}>Environmental Timeline — Persistent Storage (SQLite)</Text>
+
+      {/* Stats Row */}
+      <View style={styles.histStatsRow}>
+        {[
+          { label: 'TOTAL SCANS', value: history.length },
+          { label: 'CRITICAL', value: history.filter(h => h.aqi_status === 'Poor' || h.water_status === 'Contaminated').length },
+          { label: 'LATEST AQI', value: history[0]?.aqi ?? '—' },
+        ].map(s => (
+          <View key={s.label} style={styles.histStat}>
+            <Text style={styles.histStatVal}>{s.value}</Text>
+            <Text style={styles.histStatLabel}>{s.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {histLoading && <ActivityIndicator color="#00E5FF" style={{ marginTop: 40 }} />}
+      {histError !== '' && <Text style={styles.histError}>{histError}</Text>}
+
+      {!histLoading && history.length === 0 && !histError && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No scans yet. Run a Planetary Scan to record data.</Text>
+        </View>
+      )}
+
+      {/* Timeline */}
+      {history.map((scan, idx) => {
+        const aqiColor = scan.aqi_status === 'Good' ? '#00E5FF' : scan.aqi_status === 'Moderate' ? '#FF9800' : '#F44336';
+        const waterColor = scan.water_status === 'Pristine' ? '#00E5FF' : scan.water_status === 'Marginal' ? '#FF9800' : '#F44336';
+        const ts = new Date(scan.timestamp + 'Z');
+        const dateStr = ts.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeStr = ts.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return (
+          <View key={scan.id} style={styles.timelineRow}>
+            {/* Left — connector */}
+            <View style={styles.timelineConnector}>
+              <View style={[styles.timelineDot, { backgroundColor: aqiColor }]} />
+              {idx < history.length - 1 && <View style={styles.timelineLine} />}
+            </View>
+            {/* Right — card */}
+            <View style={[styles.histCard, { borderLeftColor: aqiColor }]}>
+              {/* Header */}
+              <View style={styles.histCardHeader}>
+                <View>
+                  <Text style={styles.histDate}>{dateStr}</Text>
+                  <Text style={styles.histTime}>{timeStr} UTC</Text>
+                </View>
+                <View style={styles.histBadge}>
+                  <Text style={styles.histBadgeTxt}>#{scan.id}</Text>
+                </View>
+              </View>
+              {/* Location */}
+              <Text style={styles.histCoords}>📍 {Number(scan.latitude).toFixed(4)}, {Number(scan.longitude).toFixed(4)}</Text>
+              {/* Metrics */}
+              <View style={styles.histMetrics}>
+                {/* AQI */}
+                <View style={styles.histMetric}>
+                  <Text style={styles.histMetricLabel}>AQI</Text>
+                  <Text style={[styles.histMetricValue, { color: aqiColor }]}>{scan.aqi}</Text>
+                  <View style={styles.miniBar}>
+                    <View style={[styles.miniBarFill, { width: `${Math.min(scan.aqi, 100)}%` as any, backgroundColor: aqiColor }]} />
+                  </View>
+                  <Text style={[styles.histMetricStatus, { color: aqiColor }]}>{scan.aqi_status}</Text>
+                </View>
+                {/* Water */}
+                <View style={styles.histMetric}>
+                  <Text style={styles.histMetricLabel}>WATER</Text>
+                  <Text style={[styles.histMetricValue, { color: waterColor }]}>{scan.water_score}</Text>
+                  <View style={styles.miniBar}>
+                    <View style={[styles.miniBarFill, { width: `${scan.water_score}%` as any, backgroundColor: waterColor }]} />
+                  </View>
+                  <Text style={[styles.histMetricStatus, { color: waterColor }]}>{scan.water_status}</Text>
+                </View>
+                {/* pH */}
+                <View style={styles.histMetric}>
+                  <Text style={styles.histMetricLabel}>pH</Text>
+                  <Text style={[styles.histMetricValue, { color: '#8A99B5' }]}>{Number(scan.water_ph).toFixed(1)}</Text>
+                  <View style={styles.miniBar}>
+                    <View style={[styles.miniBarFill, { width: `${((scan.water_ph - 6) / 3) * 100}%` as any, backgroundColor: '#8A99B5' }]} />
+                  </View>
+                  <Text style={styles.histMetricStatus}>NORMAL</Text>
+                </View>
+              </View>
+              {/* Insights count */}
+              {scan.insights_count > 0 && (
+                <View style={styles.histInsightBadge}>
+                  <Text style={styles.histInsightTxt}>⚡ {scan.insights_count} AI Insight{scan.insights_count > 1 ? 's' : ''} generated</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
+
   const isCore = activeModule === 'CORE:COMMAND';
 
   const renderModule = () => {
@@ -177,6 +297,7 @@ export default function HomeScreen() {
       case 'AirTrace':   return renderAirTrace();
       case 'SoilSense':  return renderSoilSense();
       case 'RiverPulse': return renderRiverPulse();
+      case 'History':    return renderHistory();
       default:           return renderCoreCommand();
     }
   };
@@ -258,4 +379,31 @@ const styles = StyleSheet.create({
   insightLevel: { fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
   insightTitle: { color: '#FFF', fontSize: 14, fontWeight: 'bold', marginBottom: 4 },
   insightMessage: { color: '#8A99B5', fontSize: 12, lineHeight: 18 },
+
+  // Phase 9 — History Timeline
+  histStatsRow: { flexDirection: 'row', gap: 10, marginBottom: 28 },
+  histStat: { flex: 1, backgroundColor: 'rgba(10,15,30,0.9)', borderWidth: 1, borderColor: '#1A233A', borderRadius: 10, padding: 14, alignItems: 'center' },
+  histStatVal: { color: '#00E5FF', fontSize: 26, fontWeight: '200', letterSpacing: 1 },
+  histStatLabel: { color: '#4A5B7A', fontSize: 9, fontWeight: 'bold', letterSpacing: 1, marginTop: 4 },
+  histError: { color: '#F44336', fontSize: 13, textAlign: 'center', marginTop: 30 },
+  timelineRow: { flexDirection: 'row', marginBottom: 0 },
+  timelineConnector: { width: 28, alignItems: 'center', paddingTop: 16 },
+  timelineDot: { width: 10, height: 10, borderRadius: 5, zIndex: 1 },
+  timelineLine: { width: 2, flex: 1, backgroundColor: '#1A233A', marginTop: 4 },
+  histCard: { flex: 1, backgroundColor: 'rgba(10,15,30,0.9)', borderWidth: 1, borderColor: '#1A233A', borderLeftWidth: 3, borderRadius: 10, padding: 16, marginBottom: 12, marginLeft: 6 },
+  histCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
+  histDate: { color: '#FFF', fontSize: 13, fontWeight: 'bold' },
+  histTime: { color: '#4A5B7A', fontSize: 10, marginTop: 2 },
+  histBadge: { backgroundColor: '#1A233A', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  histBadgeTxt: { color: '#4A5B7A', fontSize: 10, fontWeight: 'bold' },
+  histCoords: { color: '#4A5B7A', fontSize: 11, marginBottom: 12 },
+  histMetrics: { flexDirection: 'row', gap: 8 },
+  histMetric: { flex: 1, backgroundColor: '#02050A', borderRadius: 7, padding: 10, borderWidth: 1, borderColor: '#1A233A' },
+  histMetricLabel: { color: '#4A5B7A', fontSize: 9, fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 },
+  histMetricValue: { fontSize: 20, fontWeight: '200', marginBottom: 6 },
+  miniBar: { height: 3, backgroundColor: '#1A233A', borderRadius: 2, overflow: 'hidden', marginBottom: 4 },
+  miniBarFill: { height: '100%', borderRadius: 2 },
+  histMetricStatus: { color: '#4A5B7A', fontSize: 9, fontWeight: 'bold' },
+  histInsightBadge: { marginTop: 10, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: 'rgba(255,193,7,0.07)', borderWidth: 1, borderColor: 'rgba(255,193,7,0.3)', borderRadius: 6, alignSelf: 'flex-start' },
+  histInsightTxt: { color: '#FFC107', fontSize: 10, fontWeight: 'bold' },
 });

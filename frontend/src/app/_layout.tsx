@@ -17,9 +17,10 @@ const MENU_ITEMS = [
   { name: 'WildPath',     icon: '🐾' },
   { name: 'WetlandWatch', icon: '🌿' },
   { name: 'CarbonMirror', icon: '📊' },
+  { name: 'History',      icon: '🕐' },
 ];
 
-const ACTIVE_MODULES = ['CORE:COMMAND', 'PlantTalk', 'AirTrace', 'SoilSense', 'RiverPulse'];
+const ACTIVE_MODULES = ['CORE:COMMAND', 'PlantTalk', 'AirTrace', 'SoilSense', 'RiverPulse', 'History'];
 
 // ─── Sidebar inner component (has access to context) ─────────────────────────
 function Sidebar() {
@@ -42,7 +43,7 @@ function Sidebar() {
       const res = await fetch(`http://localhost:8000/aggregate?lat=${lat}&lon=${lon}`);
       const data = await res.json();
       setAggregateData(data);
-      // Phase 8: auto-run rule engine after every scan
+      // Phase 8: auto-run rule engine
       const insightRes = await fetch('http://localhost:8000/insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -56,7 +57,24 @@ function Sidebar() {
         })
       });
       const insightData = await insightRes.json();
-      setInsights(insightData.insights ?? []);
+      const fetchedInsights = insightData.insights ?? [];
+      setInsights(fetchedInsights);
+      // Phase 9: auto-save scan to SQLite history
+      await fetch('http://localhost:8000/scan/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          latitude: lat,
+          longitude: lon,
+          aqi: data.air?.aqi ?? 0,
+          aqi_status: data.air?.status ?? 'Unknown',
+          water_score: data.water?.score ?? 0,
+          water_status: data.water?.status ?? 'Unknown',
+          water_ph: data.water?.metrics?.ph ?? 7.0,
+          turbidity: data.water?.metrics?.turbidity_ntu ?? 0,
+          insights_count: fetchedInsights.length,
+        })
+      });
     } catch {
       Alert.alert('Backend Error', 'Cannot reach backend at localhost:8000.');
     } finally {
@@ -186,6 +204,19 @@ function Sidebar() {
           );
         }
         return null;
+
+      case 'History':
+        return (
+          <View style={styles.moduleControls}>
+            <Text style={styles.controlsHeader}>HISTORY CONTROLS</Text>
+            <TouchableOpacity style={[styles.ctrlBtn, { borderColor: '#F44336' }]} onPress={async () => {
+              await fetch('http://localhost:8000/scan/history', { method: 'DELETE' });
+              Alert.alert('Cleared', 'Scan history has been deleted.');
+            }}>
+              <Text style={[styles.ctrlBtnTxt, { color: '#F44336' }]}>🗑 Clear History</Text>
+            </TouchableOpacity>
+          </View>
+        );
 
       default:
         return null;

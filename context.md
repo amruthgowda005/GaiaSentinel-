@@ -20,7 +20,50 @@
 - Frontend navigation assumes basic routing for Phase 1.
 
 **Next Phase Plan:**
-- Awaiting Phase 9 prompt from user.
+- Awaiting Phase 10 prompt from user.
+
+## Phase 9
+**Goal:** Persistent storage of environmental scan data with a History Timeline UI.
+
+**Database:** SQLite (via `aiosqlite`) — zero-config, file-based, runs locally at `gaia_sentinel.db`
+
+**DB Schema:**
+```sql
+CREATE TABLE IF NOT EXISTS scans (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  timestamp       TEXT NOT NULL,          -- ISO 8601 UTC
+  latitude        REAL,                   -- GPS latitude
+  longitude       REAL,                   -- GPS longitude
+  aqi             INTEGER,                -- Air Quality Index value
+  aqi_status      TEXT,                   -- Good | Moderate | Poor
+  water_score     INTEGER,                -- 0-100 composite water health
+  water_status    TEXT,                   -- Pristine | Marginal | Contaminated
+  water_ph        REAL,                   -- pH reading (6.0 - 9.0)
+  turbidity       REAL,                   -- NTU reading
+  insights_count  INTEGER DEFAULT 0       -- # of AI insights generated
+);
+```
+
+**Storage Logic:**
+- Every `fetchAggregate()` call in `_layout.tsx` auto-saves a scan record after collecting air + water + insight data
+- `POST /scan/save` — inserts a new scan row with all metrics
+- `GET /scan/history?limit=N` — returns last N scans ordered by newest first
+- `DELETE /scan/history` — clears all records (accessible from History sidebar controls)
+
+**APIs:**
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/scan/save` | Save a new scan record |
+| GET | `/scan/history` | Retrieve scan history (default: 20) |
+| DELETE | `/scan/history` | Clear all history |
+
+**Frontend (History Module):**
+- Stats row: Total Scans, Critical count, Latest AQI
+- Vertical timeline with color-coded dots (cyan=Good, orange=Moderate, red=Poor)
+- Per-scan card: date/time, coordinates, AQI bar, Water bar, pH bar, AI insight count badge
+- Pull-to-refresh support
+- Auto-loads when History tab is selected
+
 
 ## Phase 8
 **APIs Created:**
