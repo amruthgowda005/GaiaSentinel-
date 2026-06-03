@@ -20,7 +20,23 @@
 - Frontend navigation assumes basic routing for Phase 1.
 
 **Next Phase Plan:**
-- Awaiting Phase 4 prompt from user.
+- Awaiting Phase 5 prompt from user.
+
+## Phase 4
+**APIs Created:**
+- `GET /air/aqi?lat=...&lon=...` (Backend) - Fetches realtime European AQI.
+
+**API Used:**
+- `Open-Meteo Air Quality API` (https://open-meteo.com/en/docs/air-quality-api)
+
+**AQI Scale Mapping:**
+- `Good`: 0-50
+- `Moderate`: 51-100
+- `Poor`: > 100
+
+**Rate Limits & Constraints:**
+- Open-Meteo is free for non-commercial use with a 10,000 API calls per day limit.
+- If the external API fails, a resilient Mock Fallback is implemented returning a default 50 AQI.
 
 ## Phase 2
 **APIs Created:**

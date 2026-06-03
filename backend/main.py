@@ -1,5 +1,6 @@
 import os
 import random
+import httpx
 from datetime import datetime
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -63,6 +64,24 @@ async def analyze_plant(file: UploadFile = File(...)):
         "filename": file.filename,
         "message": "Analysis complete"
     }
+
+@app.get("/air/aqi")
+async def get_aqi(lat: float, lon: float):
+    # Free Open-Meteo Air Quality API
+    url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}&current=european_aqi"
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url)
+            data = response.json()
+            aqi = data.get("current", {}).get("european_aqi", 45) # default 45 if missing
+            
+            status = "Good"
+            if aqi > 100: status = "Poor"
+            elif aqi > 50: status = "Moderate"
+            
+            return {"aqi": aqi, "status": status, "provider": "Open-Meteo"}
+        except Exception:
+            return {"aqi": 50, "status": "Good", "provider": "Mock Fallback"}
 
 if __name__ == "__main__":
     import uvicorn
