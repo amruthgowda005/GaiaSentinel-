@@ -289,6 +289,119 @@ export default function HomeScreen() {
     </ScrollView>
   );
 
+  // ─── ADMIN / MONITORING (Phase 10) ───────────────────────────────────────
+  const [adminHealth, setAdminHealth] = useState<any>(null);
+  const [apiLogs, setApiLogs] = useState<any[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [testResults, setTestResults] = useState<any[]>([]);
+
+  const loadAdminData = useCallback(async () => {
+    setAdminLoading(true);
+    try {
+      const [healthRes, logsRes] = await Promise.all([
+        fetch('http://localhost:8000/admin/health'),
+        fetch('http://localhost:8000/admin/logs?limit=20')
+      ]);
+      setAdminHealth(await healthRes.json());
+      setApiLogs((await logsRes.json()).logs);
+    } catch {
+      // ignore
+    } finally {
+      setAdminLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeModule === 'Admin') loadAdminData();
+  }, [activeModule, loadAdminData]);
+
+  const handleTestModule = async (mod: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/admin/test/${mod}`, { method: 'POST' });
+      const data = await res.json();
+      setTestResults(prev => [data, ...prev]);
+    } catch (e) {
+      setTestResults(prev => [{ module: mod, status: 'error', error: String(e) }, ...prev]);
+    }
+  };
+
+  const renderAdmin = () => (
+    <ScrollView
+      contentContainerStyle={[styles.content, { paddingBottom: 80 }]}
+      refreshControl={<RefreshControl refreshing={adminLoading} onRefresh={loadAdminData} tintColor="#00E5FF" />}
+    >
+      <Text style={styles.moduleTitle}>⚙️ SYSTEM ADMIN</Text>
+      <Text style={styles.moduleSubtitle}>Debug Panel, Diagnostics & Log Viewer</Text>
+
+      {adminHealth && (
+        <View style={styles.adminSection}>
+          <Text style={styles.adminSectionTitle}>SYSTEM HEALTH</Text>
+          <View style={styles.metricsGrid}>
+            <View style={styles.metricBox}>
+              <Text style={styles.metricLabel}>UPTIME</Text>
+              <Text style={styles.metricValue}>{adminHealth.uptime}</Text>
+            </View>
+            <View style={styles.metricBox}>
+              <Text style={styles.metricLabel}>CPU / RAM</Text>
+              <Text style={styles.metricValue}>{adminHealth.system.cpu_percent}% / {adminHealth.system.ram_percent}%</Text>
+            </View>
+            <View style={styles.metricBox}>
+              <Text style={styles.metricLabel}>DB SIZE</Text>
+              <Text style={styles.metricValue}>{adminHealth.database.size_kb} KB</Text>
+            </View>
+            <View style={styles.metricBox}>
+              <Text style={styles.metricLabel}>TOTAL SCANS</Text>
+              <Text style={styles.metricValue}>{adminHealth.database.scans_stored}</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.adminSection}>
+        <Text style={styles.adminSectionTitle}>MODULE DIAGNOSTICS</Text>
+        <View style={styles.testButtonsRow}>
+          {['health', 'air', 'water', 'soil', 'plant', 'aggregate', 'insights', 'history'].map(mod => (
+            <TouchableOpacity key={mod} style={styles.testBtn} onPress={() => handleTestModule(mod)}>
+              <Text style={styles.testBtnTxt}>TEST {mod.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {testResults.length > 0 && (
+          <View style={styles.testResultsBox}>
+            {testResults.slice(0, 5).map((res, i) => (
+              <Text key={i} style={{ color: res.status === 'ok' ? '#00E5FF' : '#F44336', fontSize: 11, marginBottom: 4 }}>
+                [{res.module.toUpperCase()}] {res.status.toUpperCase()} {res.error ? `- ${res.error}` : ''}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View style={styles.adminSection}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <Text style={styles.adminSectionTitle}>API TRAFFIC LOGS</Text>
+          <TouchableOpacity onPress={async () => {
+            await fetch('http://localhost:8000/admin/logs', { method: 'DELETE' });
+            loadAdminData();
+          }}>
+            <Text style={{ color: '#F44336', fontSize: 10, fontWeight: 'bold' }}>CLEAR LOGS</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.logsContainer}>
+          {apiLogs.map(log => (
+            <View key={log.id} style={styles.logRow}>
+              <Text style={styles.logMethod}>{log.method}</Text>
+              <Text style={styles.logPath}>{log.path}</Text>
+              <Text style={[styles.logStatus, { color: log.status >= 400 ? '#F44336' : '#00E5FF' }]}>{log.status}</Text>
+              <Text style={styles.logTime}>{log.duration_ms}ms</Text>
+            </View>
+          ))}
+          {apiLogs.length === 0 && <Text style={{ color: '#4A5B7A', fontSize: 11 }}>No recent API calls.</Text>}
+        </View>
+      </View>
+    </ScrollView>
+  );
+
   const isCore = activeModule === 'CORE:COMMAND';
 
   const renderModule = () => {
@@ -298,6 +411,7 @@ export default function HomeScreen() {
       case 'SoilSense':  return renderSoilSense();
       case 'RiverPulse': return renderRiverPulse();
       case 'History':    return renderHistory();
+      case 'Admin':      return renderAdmin();
       default:           return renderCoreCommand();
     }
   };
@@ -406,4 +520,18 @@ const styles = StyleSheet.create({
   histMetricStatus: { color: '#4A5B7A', fontSize: 9, fontWeight: 'bold' },
   histInsightBadge: { marginTop: 10, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: 'rgba(255,193,7,0.07)', borderWidth: 1, borderColor: 'rgba(255,193,7,0.3)', borderRadius: 6, alignSelf: 'flex-start' },
   histInsightTxt: { color: '#FFC107', fontSize: 10, fontWeight: 'bold' },
+
+  // Phase 10 — Admin
+  adminSection: { backgroundColor: 'rgba(10,15,30,0.9)', padding: 20, borderRadius: 12, borderWidth: 1, borderColor: '#1A233A', marginBottom: 20 },
+  adminSectionTitle: { color: '#4A5B7A', fontSize: 11, fontWeight: 'bold', letterSpacing: 1, marginBottom: 12 },
+  testButtonsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  testBtn: { backgroundColor: 'rgba(0,229,255,0.05)', borderWidth: 1, borderColor: '#00E5FF', borderRadius: 6, paddingVertical: 8, paddingHorizontal: 12 },
+  testBtnTxt: { color: '#00E5FF', fontSize: 10, fontWeight: 'bold' },
+  testResultsBox: { backgroundColor: '#02050A', padding: 12, borderRadius: 6, borderWidth: 1, borderColor: '#1A233A' },
+  logsContainer: { backgroundColor: '#02050A', borderRadius: 8, borderWidth: 1, borderColor: '#1A233A', padding: 12 },
+  logRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#1A233A' },
+  logMethod: { color: '#00E5FF', fontSize: 10, fontWeight: 'bold', width: 50 },
+  logPath: { color: '#8A99B5', fontSize: 11, flex: 1 },
+  logStatus: { fontSize: 11, fontWeight: 'bold', width: 40, textAlign: 'right' },
+  logTime: { color: '#4A5B7A', fontSize: 10, width: 50, textAlign: 'right' },
 });

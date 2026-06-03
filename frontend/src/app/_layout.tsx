@@ -18,9 +18,10 @@ const MENU_ITEMS = [
   { name: 'WetlandWatch', icon: '🌿' },
   { name: 'CarbonMirror', icon: '📊' },
   { name: 'History',      icon: '🕐' },
+  { name: 'Admin',        icon: '⚙️' },
 ];
 
-const ACTIVE_MODULES = ['CORE:COMMAND', 'PlantTalk', 'AirTrace', 'SoilSense', 'RiverPulse', 'History'];
+const ACTIVE_MODULES = ['CORE:COMMAND', 'PlantTalk', 'AirTrace', 'SoilSense', 'RiverPulse', 'History', 'Admin'];
 
 // ─── Sidebar inner component (has access to context) ─────────────────────────
 function Sidebar() {
@@ -215,6 +216,14 @@ function Sidebar() {
             }}>
               <Text style={[styles.ctrlBtnTxt, { color: '#F44336' }]}>🗑 Clear History</Text>
             </TouchableOpacity>
+          </View>
+        );
+
+      case 'Admin':
+        return (
+          <View style={styles.moduleControls}>
+            <Text style={styles.controlsHeader}>ADMIN CONTROLS</Text>
+            <Text style={{ color: '#4A5B7A', fontSize: 10 }}>View system health and logs in the main panel.</Text>
           </View>
         );
 

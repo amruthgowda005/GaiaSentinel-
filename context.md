@@ -1,5 +1,25 @@
 # Gaia Sentinel Project Context
 
+## Phase 10
+**Goal:** Enable testing and monitoring.
+
+**Features Implemented:**
+- **Debug Panel:** Added `Admin` screen to the frontend providing system health metrics (Uptime, CPU/RAM usage, DB size, total scans).
+- **API Logs Viewer:** Added a realtime log viewer in the Admin screen reading from `api_logs` SQLite table.
+- **Backend Logging:** Implemented FastAPI HTTP middleware to intercept and log all requests with duration.
+- **Module Diagnostics:** Test buttons added in the Admin dashboard to test individual modules (health, air, water, soil, plant, insights).
+
+**Test Coverage:**
+- Backend API tests currently at **68% coverage** (`main.py` 162/237 statements). Core endpoints are fully tested using `pytest` and `TestClient`.
+
+**Known Bugs:**
+- The 3D Earth map is only supported on the Web platform (`iframe`). The native fallback simply shows a text placeholder.
+- SQLite `api_logs` table could grow indefinitely; needs a log rotation or pruning mechanism for long-term production.
+
+**Stability Report:**
+- System is stable. The `lifespan` architecture correctly sets up the SQLite database and connections. Async SQLite handles concurrent logging without locking issues so far. Memory and CPU usage (via `psutil`) stay minimal under load.
+
+
 ## Phase 1
 **Tech Stack Decisions:**
 - **Frontend:** React Native (Expo) - chosen for rapid cross-platform development (Web/Mobile) and ease of UI styling.

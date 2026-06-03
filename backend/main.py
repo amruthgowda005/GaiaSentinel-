@@ -1,19 +1,23 @@
 import os
 import random
+import time
 import httpx
 import aiosqlite
+import psutil
 from contextlib import asynccontextmanager
-from datetime import datetime
-from fastapi import FastAPI, File, UploadFile, Form
+from datetime import datetime, timezone
+from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import aiofiles
+
+START_TIME = time.time()
 
 DB_PATH = "gaia_sentinel.db"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: create tables
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS scans (
@@ -30,13 +34,21 @@ async def lifespan(app: FastAPI):
                 insights_count INTEGER DEFAULT 0
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS api_logs (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                method    TEXT NOT NULL,
+                path      TEXT NOT NULL,
+                status    INTEGER NOT NULL,
+                duration_ms REAL NOT NULL
+            )
+        """)
         await db.commit()
     yield
-    # Shutdown: nothing to clean up
 
 app = FastAPI(title="Gaia Sentinel API", version="1.0.0", lifespan=lifespan)
 
-# Allow CORS for frontend interaction
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,6 +56,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Phase 10: Request logging middleware ──────────────────────────────────────
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    t0 = time.time()
+    response = await call_next(request)
+    duration = round((time.time() - t0) * 1000, 2)
+    ts = datetime.now(timezone.utc).isoformat()
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT INTO api_logs (timestamp, method, path, status, duration_ms) VALUES (?,?,?,?,?)",
+                (ts, request.method, request.url.path, response.status_code, duration)
+            )
+            await db.commit()
+    except Exception:
+        pass
+    return response
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -294,6 +324,100 @@ async def clear_history():
         await db.execute("DELETE FROM scans")
         await db.commit()
     return {"message": "History cleared"}
+
+# ── Phase 10: Admin / Monitoring ─────────────────────────────────────────────
+@app.get("/admin/health")
+async def admin_health():
+    uptime_s = int(time.time() - START_TIME)
+    hours, rem = divmod(uptime_s, 3600)
+    mins, secs = divmod(rem, 60)
+
+    db_size_kb = 0
+    scan_count = 0
+    log_count  = 0
+    try:
+        db_size_kb = round(os.path.getsize(DB_PATH) / 1024, 1)
+        async with aiosqlite.connect(DB_PATH) as db:
+            cur = await db.execute("SELECT COUNT(*) FROM scans")
+            scan_count = (await cur.fetchone())[0]
+            cur = await db.execute("SELECT COUNT(*) FROM api_logs")
+            log_count = (await cur.fetchone())[0]
+    except Exception:
+        pass
+
+    mem = psutil.virtual_memory()
+    cpu = psutil.cpu_percent(interval=0.2)
+
+    return {
+        "status": "healthy",
+        "service": "Gaia Sentinel Backend",
+        "uptime": f"{hours:02d}h {mins:02d}m {secs:02d}s",
+        "uptime_seconds": uptime_s,
+        "database": {
+            "path": DB_PATH,
+            "size_kb": db_size_kb,
+            "scans_stored": scan_count,
+            "logs_stored":  log_count,
+        },
+        "system": {
+            "cpu_percent":     cpu,
+            "ram_used_mb":     round(mem.used / 1024 / 1024, 1),
+            "ram_total_mb":    round(mem.total / 1024 / 1024, 1),
+            "ram_percent":     mem.percent,
+        },
+        "modules": [
+            "health", "upload", "plant/analyze", "air/aqi",
+            "soil/analyze", "water/quality", "aggregate",
+            "insights", "scan/save", "scan/history",
+        ],
+    }
+
+@app.get("/admin/logs")
+async def get_logs(limit: int = 100, offset: int = 0):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM api_logs ORDER BY id DESC LIMIT ? OFFSET ?",
+            (limit, offset)
+        )
+        rows = await cur.fetchall()
+        cur2 = await db.execute("SELECT COUNT(*) FROM api_logs")
+        total = (await cur2.fetchone())[0]
+    return {"logs": [dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
+
+@app.delete("/admin/logs")
+async def clear_logs():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM api_logs")
+        await db.commit()
+    return {"message": "Logs cleared"}
+
+@app.post("/admin/test/{module}")
+async def test_module(module: str):
+    """Fire a test request at any module and return the result."""
+    results: dict = {}
+    try:
+        if module == "health":
+            results = {"status": "healthy", "service": "Gaia Sentinel Backend"}
+        elif module == "air":
+            results = await get_aqi(lat=12.9716, lon=77.5946)
+        elif module == "water":
+            results = await get_water_quality(lat=12.9716, lon=77.5946)
+        elif module == "soil":
+            results = await analyze_soil(SoilData(ph=6.8, moisture=45.0, soil_type="Loam"))
+        elif module == "plant":
+            results = {"phi_score": random.randint(30,100), "status": "Mock", "message": "Mock test — no image needed"}
+        elif module == "insights":
+            results = await get_insights(InsightRequest())
+        elif module == "aggregate":
+            results = await get_aggregate_data(lat=12.9716, lon=77.5946)
+        elif module == "history":
+            results = await get_history(limit=5)
+        else:
+            return JSONResponse(status_code=404, content={"error": f"Unknown module: {module}"})
+        return {"module": module, "status": "ok", "result": results}
+    except Exception as e:
+        return {"module": module, "status": "error", "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

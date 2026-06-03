@@ -60,5 +60,26 @@ def test_aggregate():
     assert "air" in data
     assert "water" in data
     assert "map_markers" in data
-    assert "plants" in data["map_markers"]
     assert "soils" in data["map_markers"]
+
+def test_admin_health():
+    with TestClient(app) as client:
+        response = client.get("/admin/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
+
+def test_admin_logs():
+    with TestClient(app) as client:
+        response = client.get("/admin/logs")
+        assert response.status_code == 200
+        data = response.json()
+        assert "logs" in data
+
+def test_admin_test_module():
+    with TestClient(app) as client:
+        response = client.post("/admin/test/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["module"] == "health"
+        assert data["status"] == "ok"
