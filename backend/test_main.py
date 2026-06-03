@@ -10,22 +10,55 @@ def test_health():
     assert response.json()["status"] == "healthy"
 
 def test_plant_analyze():
-    # Create a dummy image file for testing
     test_filename = "test_image.jpg"
     with open(test_filename, "wb") as f:
         f.write(b"mock image content")
-        
-    # Send test request
     with open(test_filename, "rb") as f:
         response = client.post("/plant/analyze", files={"file": (test_filename, f, "image/jpeg")})
-    
-    # Cleanup
     os.remove(test_filename)
-    
-    # Assertions
     assert response.status_code == 200
     data = response.json()
     assert "phi_score" in data
     assert "status" in data
     assert 30 <= data["phi_score"] <= 100
     assert data["status"] in ["Healthy", "Moderate", "Critical"]
+
+def test_soil_analyze():
+    response = client.post("/soil/analyze", json={"ph": 7.0, "moisture": 45.0, "soil_type": "Loam"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "soil_score" in data
+    assert "status" in data
+    assert data["status"] in ["Optimal", "Fair", "Critical"]
+
+def test_soil_bad_ph():
+    response = client.post("/soil/analyze", json={"ph": 3.0, "moisture": 50.0, "soil_type": "Clay"})
+    assert response.status_code == 200
+    assert response.json()["status"] in ["Fair", "Critical"]
+
+def test_aqi_endpoint():
+    response = client.get("/air/aqi?lat=12.97&lon=77.59")
+    assert response.status_code == 200
+    data = response.json()
+    assert "aqi" in data
+    assert "status" in data
+
+def test_water_quality():
+    response = client.get("/water/quality?lat=12.97&lon=77.59")
+    assert response.status_code == 200
+    data = response.json()
+    assert "score" in data
+    assert "metrics" in data
+    assert "ph" in data["metrics"]
+    assert "turbidity_ntu" in data["metrics"]
+    assert "do_mgl" in data["metrics"]
+
+def test_aggregate():
+    response = client.get("/aggregate?lat=12.97&lon=77.59")
+    assert response.status_code == 200
+    data = response.json()
+    assert "air" in data
+    assert "water" in data
+    assert "map_markers" in data
+    assert "plants" in data["map_markers"]
+    assert "soils" in data["map_markers"]

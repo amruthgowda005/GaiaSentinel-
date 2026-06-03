@@ -44,6 +44,8 @@ export default function HomeScreen() {
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
       setAnalysisResult(null); 
+      // Reset aggregate to avoid flashing old data on new location
+      setAggregateData(null);
       const loc = await Location.getCurrentPositionAsync({});
       setLocation(loc);
     }
@@ -107,13 +109,13 @@ export default function HomeScreen() {
             )}
 
             {/* Tactical Overlays */}
-            {aggregateData && layers.plants && aggregateData.map_markers.plants.map((p: any) => (
-              <View key={`p-${p.id}`} style={[styles.marker, { left: 150 + (p.lon - location!.coords.longitude)*1000, top: 150 + (p.lat - location!.coords.latitude)*1000, backgroundColor: getStatusColor(p.status) }]} />
+            {aggregateData && layers.plants && aggregateData.map_markers?.plants?.map((p: any) => (
+              <View key={`p-${p.id}`} style={[styles.marker, { left: 150 + (p.lon - (location?.coords?.longitude || 0))*1000, top: 150 + (p.lat - (location?.coords?.latitude || 0))*1000, backgroundColor: getStatusColor(p.status) }]} />
             ))}
-            {aggregateData && layers.soils && aggregateData.map_markers.soils.map((s: any) => (
-              <View key={`s-${s.id}`} style={[styles.markerSquare, { left: 150 + (s.lon - location!.coords.longitude)*1000, top: 150 + (s.lat - location!.coords.latitude)*1000, backgroundColor: s.score > 70 ? '#00E5FF' : '#FF9800' }]} />
+            {aggregateData && layers.soils && aggregateData.map_markers?.soils?.map((s: any) => (
+              <View key={`s-${s.id}`} style={[styles.markerSquare, { left: 150 + (s.lon - (location?.coords?.longitude || 0))*1000, top: 150 + (s.lat - (location?.coords?.latitude || 0))*1000, backgroundColor: s.score > 70 ? '#00E5FF' : '#FF9800' }]} />
             ))}
-            {aggregateData && layers.air && (
+            {aggregateData && layers.air && aggregateData.air && (
               <View style={[styles.airOverlay, { backgroundColor: getStatusColor(aggregateData.air.status) }]} />
             )}
           </View>
@@ -176,10 +178,10 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
               {soilResult && (
-                <View style={{marginTop: 15}}>
-                  <Text style={[styles.panelSub, {color: getStatusColor(soilResult.status)}]}>SCORE: {soilResult.soil_score} ({soilResult.status.toUpperCase()})</Text>
-                  <Text style={{color: '#8A99B5', fontSize: 10, marginTop: 5}}>{soilResult.recommendation}</Text>
-                </View>
+                 <View style={{marginTop: 15}}>
+                   <Text style={[styles.panelSub, {color: getStatusColor(soilResult.status)}]}>SCORE: {soilResult.soil_score} ({soilResult.status.toUpperCase()})</Text>
+                   <Text style={{color: '#8A99B5', fontSize: 10, marginTop: 5}}>{soilResult.recommendation}</Text>
+                 </View>
               )}
             </View>
           )}
